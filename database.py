@@ -4,6 +4,7 @@ from pathlib import Path
 
 from logic import public_listings
 
+# Tests
 FIXTURE_PATH = Path(__file__).parent / "data" / "internships.csv"
 LOCATION_PATH = Path(__file__).parent / "data" / "internship_locations.csv"
 
@@ -28,6 +29,6 @@ def load_internships(path=FIXTURE_PATH, location_path=LOCATION_PATH):
     return listings
 
 
-def load_public_internships(path=FIXTURE_PATH, today=None, location_path=LOCATION_PATH):
-    # Supabase: query only visible rows and public fields through the public-read RPC.
-    return public_listings(load_internships(path, location_path), today)
+def load_public_internships(path=FIXTURE_PATH, location_path=LOCATION_PATH):
+    """Filter loaded internships to public-only"""
+    return public_listings(load_internships(path, location_path))

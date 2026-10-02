@@ -1,8 +1,13 @@
 [theme]
 base = "light"
 primaryColor = "#5B2C90"
-backgroundColor = "#F7F3FC"
-secondaryBackgroundColor = "#E8DDF3"
-textColor = "#261735"
-borderColor = "#C5AFDC"
+backgroundColor = "#EDE6F5"
+secondaryBackgroundColor = "#F3EDF8"
+textColor = "#2B193E"
+borderColor = "#DED2EA"
 font = "sans-serif"
+baseRadius = "12px"
+buttonRadius = "10px"
+headingFontSizes = ["2.5rem", "1.75rem", "1.3rem"]
+headingFontWeights = [750, 650, 650]
+violetColor = "#5B2C90"

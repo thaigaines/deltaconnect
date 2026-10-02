@@ -2,6 +2,7 @@
 
 ## Working approach
 
+- The user writes application logic for practice. Focus agent edits on tedious tasks, formatting, and small explicitly requested changes; provide advice instead of substantial implementations unless requested.
 - Evaluate proposals independently. Push back on choices you disagree with, explain tradeoffs, and recommend an alternative. Use primary-source research when evidence could change the decision. Respect the user's informed final choice.
 - Keep code minimal and readable for student maintainers. Add dependencies or abstractions only for concrete requirements.
 - Preserve user changes and stay within scope. Get confirmation before pushing, deploying, publishing, deleting material files, or changing shared systems.
@@ -17,7 +18,7 @@ Correct errors by archiving the old listing and creating a new one. Keep listing
 
 Use Streamlit and plain functions:
 
-- `app.py`: UI and input.
+- `app.py`: shared configuration and navigation; `app_pages/`: page UI and input.
 - `logic.py`: search, filtering, sorting, and visibility.
 - `database.py`: loading, persistence, and conversion to the common application representation.
 

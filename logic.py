@@ -8,14 +8,15 @@ def chapter_today():
     return datetime.now(ZoneInfo("America/New_York")).date()
 
 
-def public_listings(listings, today=None):
-    # Supabase: enforce this visibility rule in public-read policies too.
-    today = today if today is not None else chapter_today()
+def public_listings(listings):
+    """Filter out"""
+    today = chapter_today()
     return [listing for listing in listings if not listing["is_archived"]
             and (listing["deadline"] is None or listing["deadline"] >= today)]
 
 
 def filter_listings(listings, query="", location=None, work_arrangement=None):
+    """Filter based on query and presence of location + work_arrangement filters"""
     query = query.strip().casefold()
     matches = [
         listing for listing in listings
