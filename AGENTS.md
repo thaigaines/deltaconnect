@@ -18,14 +18,16 @@ Correct errors by archiving the old listing and creating a new one. Keep listing
 Use Streamlit and plain functions:
 
 - `app.py`: UI and input.
-- `logic.py`: validation, search, filtering, sorting, and visibility.
+- `logic.py`: search, filtering, sorting, and visibility.
 - `database.py`: loading, persistence, and conversion to the common application representation.
 
-Read `SCHEMA.md` before changing listing fields, storage, authentication, or committee operations. It defines the planned normalized tables and write restrictions, not implemented functionality. CSV is for local fixtures; production storage uses Supabase. Keep location lists in the app and JSON arrays in CSV, converting to/from child rows at the storage boundary. Create listings and locations atomically.
+Read `SCHEMA.md` before changing listing fields, storage, authentication, or committee operations. It defines the planned normalized tables and write restrictions, not implemented functionality. CSV fixtures mirror listing and location tables; production storage uses Supabase. Format child rows as location labels at the storage boundary. Create listings and locations atomically.
+
+The reader trusts cleaned, valid records. Keep only transport-type conversion and presentation formatting on reads; validate and clean during imports or committee input, with database constraints enforcing stored values.
 
 ## Listing behavior
 
-- Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate from geographic eligibility.
+- Limit locations to the US. Store city/state as defined in `SCHEMA.md` and generate display labels. Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate from geographic eligibility.
 - Public visibility requires no manual archival and an absent deadline or deadline on/after today in `America/New_York`. Enforce this before public retrieval; compute expiration on reads.
 - Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display absent deadlines as “No deadline provided,” not rolling applications.
 - Retain expired and archived records for committee access. Restoring only clears archival; an expired listing remains hidden.

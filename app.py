@@ -19,7 +19,7 @@ def main():
     st.caption("Sample data for testing. Fictional opportunities.")
     try:
         internships = load_public_internships()
-    except (OSError, ValueError) as error:
+    except OSError as error:
         # Supabase: handle query failures and keep sensitive details out of the UI.
         st.error(f"Internships could not be loaded: {error}")
         st.stop()

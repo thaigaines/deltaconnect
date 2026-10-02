@@ -1,46 +1,33 @@
 import csv
-import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
-from logic import public_listings, validate_listing
+from logic import public_listings
 
 FIXTURE_PATH = Path(__file__).parent / "data" / "internships.csv"
+LOCATION_PATH = Path(__file__).parent / "data" / "internship_locations.csv"
 
 
-def load_internships(path=FIXTURE_PATH):
-    """Parse local csv, retain hidden rows for local validation in logic.py."""
-    # Supabase: replace CSV parsing with a query returning this same listing shape.
+def load_internships(path=FIXTURE_PATH, location_path=LOCATION_PATH):
+    """Read clean fixtures and format their types and location labels for the app."""
+    locations = {}
+    with Path(location_path).open(encoding="utf-8-sig", newline="") as source:
+        for row in csv.DictReader(source):
+            locations.setdefault(row["internship_id"], []).append(
+                f"{row['city']}, {row['state']}"
+            )
+
     listings = []
-    seen_ids = set()
     with Path(path).open(encoding="utf-8-sig", newline="") as source:
-        for row_number, row in enumerate(csv.DictReader(source), start=2):
-            try:
-                archived = row["is_archived"].strip().lower()
-                if archived not in ("true", "false"):
-                    raise ValueError("is_archived must be true or false")
-                deadline = row["deadline"].strip()
-                listing = {
-                    "id": row["id"].strip(),
-                    "title": row["title"].strip(),
-                    "company": row["company"].strip(),
-                    "application_url": row["application_url"].strip(),
-                    "work_arrangement": row["work_arrangement"].strip(),
-                    "locations": json.loads(row["locations"]),
-                    "deadline": date.fromisoformat(deadline) if deadline else None,
-                    "is_archived": archived == "true",
-                }
-                # Supabase: validate editor input before writes; use a UUID primary key.
-                validate_listing(listing)
-                if listing["id"] in seen_ids:
-                    raise ValueError("Duplicate listing id")
-                seen_ids.add(listing["id"])
-                listings.append(listing)
-            except (KeyError, TypeError, ValueError, AttributeError) as error:
-                raise ValueError(f"Invalid internship CSV row {row_number}: {error}") from error
+        for row in csv.DictReader(source):
+            row["deadline"] = date.fromisoformat(row["deadline"]) if row["deadline"] else None
+            row["is_archived"] = row["is_archived"] == "true"
+            row["created_at"] = datetime.fromisoformat(row["created_at"])
+            row["locations"] = sorted(locations.get(row["id"], []))
+            listings.append(row)
     return listings
 
 
-def load_public_internships(path=FIXTURE_PATH, today=None):
-    # Supabase: use public access that returns only visible rows and public fields.
-    return public_listings(load_internships(path), today)
+def load_public_internships(path=FIXTURE_PATH, today=None, location_path=LOCATION_PATH):
+    # Supabase: query only visible rows and public fields through the public-read RPC.
+    return public_listings(load_internships(path, location_path), today)
