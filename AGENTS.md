@@ -10,9 +10,9 @@
 
 ## Product and database rules
 
-Read `supabase/README.md` before changing listing behavior, authentication, roles, resumes, or database access. It is the authoritative source for current rules. `SCHEMA.md` describes columns; migrations implement the database. Distinguish intended rules, local verification, and hosted state.
+Read `README.md` before changing listing behavior, authentication, roles, resumes, or database access. It is the authoritative source for current rules; migrations implement the database and define columns. Distinguish intended rules, local verification, and hosted state.
 
-Use owner-controlled accounts: allowed users browse internships immediately after login, with approval handled during account provisioning rather than a separate approval flow in the UI. Keep the resume directory and downloads on a separate public page accessible without login. Follow the database README for provisioning and editor permissions.
+Use owner-controlled accounts: allowed users browse internships immediately after login, with approval handled during account provisioning rather than a separate approval flow in the UI. Keep the resume directory and downloads on a separate public page accessible without login. Follow `README.md` for provisioning and editor permissions.
 
 DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 
@@ -26,6 +26,6 @@ The SQL setup does not automatically connect the frontend. Use user-scoped acces
 
 ## Verification
 
-Check affected validation, presentation, permissions, and failure cases against `supabase/README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
+Check affected validation, presentation, permissions, and failure cases against `README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
 
 Keep setup documentation concise and use DeltaConnect consistently.
