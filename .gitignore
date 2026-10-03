@@ -1,27 +1,13 @@
 # Local credentials
-.streamlit/secrets.toml
-.streamlit/secrets.toml.*
-!.streamlit/secrets.toml.example
 .env
 .env.*
 !.env.example
 
-# Python virtual environments
-.venv/
-venv/
-env/
-ENV/
+# JavaScript dependencies and build output
+node_modules/
+dist/
 
-# Python-generated files
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
+# Local logs
 *.log
 
 # Editor and operating-system files

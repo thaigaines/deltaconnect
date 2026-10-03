@@ -12,26 +12,20 @@
 
 Read `supabase/README.md` before changing listing behavior, authentication, roles, resumes, or database access. It is the authoritative source for current rules. `SCHEMA.md` describes columns; migrations implement the database. Distinguish intended rules, local verification, and hosted state.
 
-DeltaConnect serves one Delta Sigma Pi chapter. Internship browsing requires approved membership; editors are approved members with additional permissions. Resumes are publicly downloadable. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
+Use owner-controlled accounts: allowed users browse internships immediately after login, with approval handled during account provisioning rather than a separate approval flow in the UI. Keep the resume directory and downloads on a separate public page accessible without login. Follow the database README for provisioning and editor permissions.
+
+DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 
 ## Implementation
 
-The current application uses Streamlit and plain Python functions:
+Use JavaScript and pnpm with its lockfile; `package.json` defines dependencies and commands. Split files only when a concrete need makes the code easier to understand.
 
-- `app.py`: configuration and navigation; `app_pages/`: UI and input.
-- `logic.py`: search, filtering, sorting, and visibility.
-- `database.py`: persistence, type conversion, and location-label formatting.
+Supabase handles authentication, database access, and Storage. Add Python supporting scripts only for concrete tasks such as data imports.
 
-The SQL setup does not automatically connect the Python app. Use user-scoped access so Supabase enforces permissions. Keep credentials outside source and fixtures. Create listings and initial locations atomically. Validate and clean input before writes; constraints enforce stored values. Reads assume valid records and perform only type conversion and presentation formatting.
-
-## Listing presentation
-
-- Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate.
-- Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display missing deadlines as “No deadline provided.”
-- Review undated listings weekly. Require explicit confirmation for duplicate application URLs.
+The SQL setup does not automatically connect the frontend. Use user-scoped access so Supabase enforces permissions. Keep credentials outside source and fixtures. Create listings and initial locations atomically. Validate and clean input before writes; constraints enforce stored values. Reads assume valid records and perform only type conversion and presentation formatting.
 
 ## Verification
 
-Check invalid fields/URLs, empty/multiple locations, duplicate overrides, Eastern-date boundaries, missing deadlines, filtering, sorting, edits, and archive/restore. Confirm regular members cannot retrieve hidden listings or their locations, while editors can. Verify denied unapproved writes, editor membership revocation, creation rollback, owner-only resume changes, public downloads, exact Storage paths, timestamps, and file/database failure cleanup.
+Check affected validation, presentation, permissions, and failure cases against `supabase/README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
 
 Keep setup documentation concise and use DeltaConnect consistently.

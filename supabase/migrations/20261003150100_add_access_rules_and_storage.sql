@@ -30,12 +30,16 @@ CREATE POLICY edit_internships ON public.internship FOR UPDATE TO authenticated
   USING ((SELECT private.is_approved_editor())) WITH CHECK ((SELECT private.is_approved_editor()));
 GRANT INSERT (internship_id, city, state), UPDATE (city, state), DELETE
   ON public.internship_location TO authenticated;
+
 CREATE POLICY read_locations ON public.internship_location FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.internship i WHERE i.id = internship_id));
+
 CREATE POLICY create_locations ON public.internship_location FOR INSERT TO authenticated
   WITH CHECK ((SELECT private.is_approved_editor()));
+
 CREATE POLICY edit_locations ON public.internship_location FOR UPDATE TO authenticated
   USING ((SELECT private.is_approved_editor())) WITH CHECK ((SELECT private.is_approved_editor()));
+
 CREATE POLICY delete_locations ON public.internship_location FOR DELETE TO authenticated
   USING ((SELECT private.is_approved_editor()));
 

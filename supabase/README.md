@@ -1,7 +1,7 @@
 # DeltaConnect Database
 
-This README defines the database rules. SQL migrations implement them; the current
-Python application still needs to be connected to these rules.
+This README defines the product and database rules. SQL migrations implement the
+database; the React frontend still needs login and data access.
 
 ## Tables
 
@@ -16,6 +16,16 @@ Python application still needs to be connected to these rules.
 ## Access
 
 RLS is enabled on all five tables. Ordinary clients use these permissions:
+
+Only owner-allowed accounts are intended to log in for internship access. Provision
+each account with an `approved_member` row before its first login, and disable
+public self-registration in Supabase Auth. Allowed users browse immediately after
+login; there is no separate membership-approval screen. The existing RLS still
+requires the approval row, so an Auth account alone does not grant database access.
+These hosted settings and approvals must be verified separately.
+
+The resume directory and PDF downloads belong on a separate public page and
+require no login. Uploading and managing a resume still requires an approved account.
 
 | Resource | Read | Write |
 | --- | --- | --- |
@@ -33,6 +43,12 @@ members; removing membership removes editor approval. Keep `private` unexposed.
 Listing creation and its initial locations are atomic. Duplicate URLs require an
 explicit `p_allow_duplicate = true` override; duplicate matches include hidden rows.
 Audit fields cannot be changed through ordinary client writes.
+
+## Listing presentation
+
+- Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate.
+- Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display missing deadlines as “No deadline provided.”
+- Review undated listings weekly. Listing creation requires explicit confirmation for duplicate application URLs.
 
 ## Resume Storage
 
