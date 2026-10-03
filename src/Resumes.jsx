@@ -1,9 +1,16 @@
 // Public resume directory: anyone can view it, no login needed.
 // Loads resume details from the database and links each one to its PDF in Supabase Storage.
+// Signed-in members also get an Add/Edit resume button for their own resume.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
+import ResumeForm from './ResumeForm.jsx'
 
-export default function Resumes() {
+// ============================================================
+// Component
+// userId: the signed-in user's id, or undefined when signed out.
+// isMember: true only for approved members, who may add or edit their own resume.
+// ============================================================
+export default function Resumes({ userId, isMember }) {
   // ---------- State ----------
   // useState returns [current value, setter]. Calling a setter re-renders the component.
   const [resumes, setResumes] = useState([])
@@ -11,6 +18,8 @@ export default function Resumes() {
   const [errorMessage, setErrorMessage] = useState('')
   // A counter whose only job is to change; changing it reruns the load effect below.
   const [refresh, setRefresh] = useState(0)
+  // Whether the add/edit form is open.
+  const [formOpen, setFormOpen] = useState(false)
 
   // ---------- Load resumes ----------
   // Runs when the page first appears and again whenever refresh changes.
@@ -41,15 +50,43 @@ export default function Resumes() {
     return () => { cancelled = true }
   }, [refresh])
 
+  // ---------- Derived values ----------
+  // Every member's file lives at '<user-id>/resume.pdf', so the member's own row can be found
+  // in the list already loaded. undefined means they haven't uploaded one yet.
+  const myResume = resumes.find((resume) => resume.object_path === `${userId}/resume.pdf`)
+
+  // ---------- Event handlers ----------
+  // After a save: close the form and reload the list so the change shows.
+  function handleSaved() {
+    setFormOpen(false)
+    setRefresh((value) => value + 1)
+  }
+
   // ---------- Render ----------
   return (
     <section aria-labelledby="resumes-heading">
-      {/* ----- Heading and refresh ----- */}
+      {/* ----- Heading, add/edit (members only), and refresh ----- */}
+      {/* The add/edit button waits for loading so it never says "Add" for a member who already has one. */}
       <div className="section-head">
         <h2 id="resumes-heading">Public resumes</h2>
-        <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
+        <div className="actions">
+          {isMember && (
+            <button type="button" disabled={loading} onClick={() => setFormOpen(true)}>
+              {myResume ? 'Edit resume' : 'Add resume'}
+            </button>
+          )}
+          <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
+        </div>
       </div>
       <p className="meta">Browse chapter resumes without logging in.</p>
+
+      {/* ----- Add/edit form: drops down here while open ----- */}
+      {/* ?? turns undefined (no resume yet) into null, which ResumeForm treats as "add". */}
+      {formOpen && (
+        <div className="panel">
+          <ResumeForm userId={userId} resume={myResume ?? null} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
+        </div>
+      )}
 
       {/* ----- Results ----- */}
       {/* The ternary chain picks one: loading message, error, empty message, or the list. */}

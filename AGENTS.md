@@ -1,4 +1,4 @@
-# ConnectDelta
+# DeltaConnect
 
 ## Working approach
 
@@ -14,7 +14,7 @@ Read `README.md` before changing listing behavior, authentication, roles, resume
 
 Use owner-controlled accounts: allowed users browse internships immediately after login, with approval handled during account provisioning rather than a separate approval flow in the UI. Keep the resume directory and downloads on a separate public page accessible without login. Follow `README.md` for provisioning and editor permissions.
 
-ConnectDelta serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
+DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 
 ## Implementation
 
@@ -30,4 +30,4 @@ The SQL setup does not automatically connect the frontend. Use user-scoped acces
 
 Check affected validation, presentation, permissions, and failure cases against `README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
 
-Keep setup documentation concise and use ConnectDelta consistently.
+Keep setup documentation concise and use DeltaConnect consistently.

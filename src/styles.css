@@ -1,4 +1,4 @@
-/* ConnectDelta styles: a dark, minimal theme.
+/* DeltaConnect styles: a dark, minimal theme.
    Purple marks what is active, actionable, or urgent; everything else stays neutral. */
 
 /* ============================================================
@@ -147,9 +147,12 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .login-card p { margin: 0; color: var(--muted); }
 .login-card form { margin-top: 1.5rem; gap: 1rem; }
 
-/* Add/edit listing form (inside .panel when adding, inside the card when editing). */
-.listing-form { gap: 1rem; }
-.listing-form h3 { margin: 0; font-size: 1.25rem; }
+/* Add/edit listing form (inside .panel when adding, inside the card when editing)
+   and the add/edit resume form (inside .panel). */
+.listing-form, .resume-form { gap: 1rem; }
+.listing-form h3, .resume-form h3 { margin: 0; font-size: 1.25rem; }
+.resume-form p { margin: 0; }
+input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker text in the taller input */
 .checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 .checkbox input { width: auto; min-height: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }

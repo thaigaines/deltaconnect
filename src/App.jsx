@@ -128,7 +128,7 @@ export default function App() {
       <header className="topbar">
         <div className="container topbar-inner">
           <div className="brand-nav">
-            <a className="brand" href="#/internships">ConnectDelta</a>
+            <a className="brand" href="#/internships">DeltaConnect</a>
             {/* aria-current marks the active link for screen readers and for the CSS highlight. */}
             <nav aria-label="Main navigation">
               <a href="#/internships" aria-current={page !== '#/resumes' ? 'page' : undefined}>Internships</a>
@@ -148,7 +148,7 @@ export default function App() {
       {/* ----- Hero: site name and a tagline that depends on the page ----- */}
       <section className="hero">
         <div className="container">
-          <h1>ConnectDelta</h1>
+          <h1>DeltaConnect</h1>
           <p className="tagline">
             {page === '#/resumes' ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
           </p>
@@ -158,12 +158,13 @@ export default function App() {
       {/* ----- Main content: exactly one screen is chosen below ----- */}
       <main className="container">
         {/* The ternary chain is checked top to bottom:
-            1. Resumes page -> public directory (no login needed)
+            1. Resumes page -> public directory (no login needed; members can also add/edit)
             2. Still checking for a saved session -> "Checking login..."
             3. Signed in -> access checks, then Listings
             4. Otherwise -> login form */}
         {page === '#/resumes' ? (
-          <Resumes />
+          // key resets the page (closing any open form) when a different account signs in.
+          <Resumes key={userId} userId={userId} isMember={permissions?.is_member === true} />
         ) : loadingSession ? (
           <p role="status">Checking login...</p>
         ) : session ? (
