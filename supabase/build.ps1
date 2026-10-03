@@ -1,3 +1,4 @@
+# Prints the migrations as one transaction; -Rebuild adds the reviewed reset first.
 param([switch]$Rebuild)
 
 $ErrorActionPreference = 'Stop'
@@ -7,6 +8,7 @@ if ($migrationFiles.Count -ne 2) { throw 'Expected the two reviewed DeltaConnect
 
 $sqlParts = @('-- DeltaConnect: run as the Supabase database administrator.', 'BEGIN;')
 if ($Rebuild) {
+    # If -Rebuild was supplied, prepend reset SQL; otherwise keep the fresh-build path.
     $sqlParts += @'
 -- REBUILD: deletes all application rows, including approvals and resume metadata.
 -- Auth accounts and Storage files remain. Review before running.
@@ -27,6 +29,7 @@ DROP POLICY IF EXISTS delete_resume_file ON storage.objects;
 '@
 }
 foreach ($migrationFile in $migrationFiles) {
+    # Append each migration in filename order so tables exist before access rules.
     $sqlParts += "-- $($migrationFile.Name)"
     $sqlParts += Get-Content -LiteralPath $migrationFile.FullName -Raw
 }

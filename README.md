@@ -21,7 +21,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 Restart Vite after changing these values. Use the publishable key; service-role
 and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 
-The frontend uses React and JavaScript. Supabase login and data access are the next
-step; database rules and setup are in [supabase/README.md](supabase/README.md).
+The React/JavaScript frontend supports invited-account login, member/editor
+internship browsing with search and filters, and a public resume directory at
+`#/resumes`. Editors see archived and expired listings too. Editor forms and resume
+uploads are deferred. Database rules and account provisioning are in
+[supabase/README.md](supabase/README.md).
 
 Python may be added for supporting tasks such as data imports when needed.

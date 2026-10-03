@@ -13,6 +13,7 @@ begin
         raise notice 'Seed skipped: set app.seed_editor_id to an approved local test editor UUID.';
         return;
     end if;
+    -- Temporarily use the test editor's identity so creation exercises the real RPC.
     perform set_config('request.jwt.claim.sub', editor_id::uuid::text, true);
     perform set_config('request.jwt.claims', json_build_object('sub', editor_id)::text, true);
 
@@ -26,6 +27,7 @@ begin
         'Marketing Intern', 'Example Organization',
         'https://example.org/internships/marketing', 'remote'
     );
+    -- Restore the session's original identity after creating the examples.
     perform set_config('request.jwt.claims', coalesce(old_claims, ''), true);
     perform set_config('request.jwt.claim.sub', coalesce(old_subject, ''), true);
 end;

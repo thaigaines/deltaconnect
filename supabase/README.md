@@ -1,7 +1,8 @@
 # DeltaConnect Database
 
 This README defines the product and database rules. SQL migrations implement the
-database; the React frontend still needs login and data access.
+database; the React frontend provides login, internship browsing, and a public
+resume directory. Editor actions and resume uploads are deferred.
 
 ## Tables
 

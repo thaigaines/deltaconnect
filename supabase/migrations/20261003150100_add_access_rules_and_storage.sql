@@ -1,3 +1,4 @@
+-- Enforces member/editor access and ownership rules for public resume storage.
 CREATE FUNCTION private.is_approved_member()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_member WHERE user_id = auth.uid()); $$;
@@ -54,13 +55,16 @@ DECLARE
   clean_url text := btrim(p_application_url);
   location jsonb;
 BEGIN
+  -- If the caller isn't an approved editor, raise an error before creating anything.
   IF NOT private.is_approved_editor() THEN
     RAISE EXCEPTION 'Editor approval required.' USING ERRCODE = '42501';
   END IF;
   IF p_locations IS NULL OR jsonb_typeof(p_locations) <> 'array' THEN
     RAISE EXCEPTION 'Locations must be an array.' USING ERRCODE = '22023';
   END IF;
+  -- Serialize creation for this URL so simultaneous submissions see duplicates.
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(clean_url, 0));
+  -- If a matching URL exists and no override was given, stop with a duplicate error.
   IF NOT coalesce(p_allow_duplicate, false) AND EXISTS (
     SELECT 1 FROM public.internship WHERE application_url = clean_url
   ) THEN
@@ -69,6 +73,8 @@ BEGIN
   INSERT INTO public.internship (title, company, application_url, work_arrangement, deadline, created_by, created_at)
     VALUES (btrim(p_title), btrim(p_company), clean_url, p_work_arrangement, p_deadline, auth.uid(), now())
     RETURNING id INTO listing_id;
+  -- For each location, check its value types, then insert the cleaned city/state.
+  -- Any failed insert rolls back the listing and its locations together.
   FOR location IN SELECT value FROM jsonb_array_elements(p_locations) LOOP
     IF jsonb_typeof(location -> 'city') IS DISTINCT FROM 'string'
       OR jsonb_typeof(location -> 'state') IS DISTINCT FROM 'string' THEN
