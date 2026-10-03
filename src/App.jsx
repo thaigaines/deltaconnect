@@ -1,4 +1,4 @@
-// Handles login, access checks, and navigation between internships and public resumes.
+// Handles login, access checks, page layout, and navigation between internships and public resumes.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Listings from './Listings.jsx'
@@ -90,31 +90,46 @@ export default function App() {
 
   // React: JSX describes the screen. Expressions inside { } use JavaScript.
   return (
-    <main>
-      <header>
-        <h1>DeltaConnect</h1>
-        <p>Internships curated by our chapter, for our chapter.</p>
-        <nav aria-label="Main navigation">
-          <a href="#/internships" aria-current={page !== '#/resumes' ? 'page' : undefined}>Internships</a>
-          <a href="#/resumes" aria-current={page === '#/resumes' ? 'page' : undefined}>Resumes</a>
-        </nav>
+    <>
+      <header className="topbar">
+        <div className="container topbar-inner">
+          <div className="brand-nav">
+            <a className="brand" href="#/internships">DeltaConnect</a>
+            <nav aria-label="Main navigation">
+              <a href="#/internships" aria-current={page !== '#/resumes' ? 'page' : undefined}>Internships</a>
+              <a href="#/resumes" aria-current={page === '#/resumes' ? 'page' : undefined}>Resumes</a>
+            </nav>
+          </div>
+          {/* && shows the account area only while signed in. */}
+          {session && (
+            <div className="account">
+              <span>{session.user.email}</span>
+              <button type="button" disabled={busy} onClick={handleSignOut}>Sign out</button>
+            </div>
+          )}
+        </div>
       </header>
 
-      {/* condition ? first : second chooses one screen: resumes first, then login loading,
-          then the signed-in area if session exists, otherwise the login form. */}
-      {page === '#/resumes' ? (
-        <Resumes />
-      ) : loadingSession ? (
-        <p role="status">Checking login...</p>
-      ) : session ? (
-        <>
-          <div className="account">
-            <p>Signed in as {session.user.email}</p>
-            <button type="button" disabled={busy} onClick={handleSignOut}>Sign out</button>
-          </div>
-          {/* Show an error if present; otherwise wait for permissions, then allow members.
-              A signed-in account without membership gets the access-denied message. */}
-          {permissionsError ? (
+      <section className="hero">
+        <div className="container">
+          <h1>DeltaConnect</h1>
+          <p className="tagline">
+            {page === '#/resumes' ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
+          </p>
+        </div>
+      </section>
+
+      <main className="container">
+        {/* condition ? first : second chooses one screen: resumes first, then login loading,
+            then the signed-in area if session exists, otherwise the login form. */}
+        {page === '#/resumes' ? (
+          <Resumes />
+        ) : loadingSession ? (
+          <p role="status">Checking login...</p>
+        ) : session ? (
+          // Show an error if present; otherwise wait for permissions, then allow members.
+          // A signed-in account without membership gets the access-denied message.
+          permissionsError ? (
             <div>
               <p role="alert">Could not check access: {permissionsError}</p>
               <button type="button" onClick={refreshAccess}>Retry access check</button>
@@ -122,38 +137,35 @@ export default function App() {
           ) : !permissions ? (
             <p role="status">Checking access...</p>
           ) : permissions.is_member ? (
-            <>
-              <p>Access: {permissions.is_editor ? 'Editor' : 'Member'}</p>
-              <Listings key={`${session.user.id}:${accessCheck}`} isEditor={permissions.is_editor} />
-            </>
+            <Listings key={`${session.user.id}:${accessCheck}`} isEditor={permissions.is_editor} />
           ) : (
             <div>
               <p>This account does not have internship access. Contact the owner.</p>
               <button type="button" onClick={refreshAccess}>Refresh access</button>
             </div>
-          )}
-        </>
-      ) : (
-        <section aria-labelledby="login-heading">
-          <h2 id="login-heading">Member login</h2>
-          <p>Chapter access is by invitation. Contact the owner for an account.</p>
-          <form onSubmit={handleLogin}>
-            <label>
-              Email
-              <input type="email" autoComplete="username" required value={email}
-                onChange={(event) => setEmail(event.target.value)} />
-            </label>
-            <label>
-              Password
-              <input type="password" autoComplete="current-password" required value={password}
-                onChange={(event) => setPassword(event.target.value)} />
-            </label>
-            <button type="submit" disabled={busy}>{busy ? 'Logging in...' : 'Log in'}</button>
-          </form>
-        </section>
-      )}
-      {/* && shows the login error only when both conditions are truthy. */}
-      {page !== '#/resumes' && errorMessage && <p role="alert">{errorMessage}</p>}
-    </main>
+          )
+        ) : (
+          <section className="login-card" aria-labelledby="login-heading">
+            <h2 id="login-heading">Member login</h2>
+            <p>Chapter access is by invitation. Contact the owner for an account.</p>
+            <form onSubmit={handleLogin}>
+              <label>
+                Email
+                <input type="email" autoComplete="username" required value={email}
+                  onChange={(event) => setEmail(event.target.value)} />
+              </label>
+              <label>
+                Password
+                <input type="password" autoComplete="current-password" required value={password}
+                  onChange={(event) => setPassword(event.target.value)} />
+              </label>
+              <button type="submit" disabled={busy}>{busy ? 'Logging in...' : 'Log in'}</button>
+            </form>
+          </section>
+        )}
+        {/* && shows the login error only when both conditions are truthy. */}
+        {page !== '#/resumes' && errorMessage && <p role="alert">{errorMessage}</p>}
+      </main>
+    </>
   )
 }

@@ -39,9 +39,11 @@ export default function Resumes() {
   // React: JSX describes the page; the conditional branches and map use JavaScript.
   return (
     <section aria-labelledby="resumes-heading">
-      <h2 id="resumes-heading">Public resumes</h2>
-      <p>Browse chapter resumes without logging in.</p>
-      <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
+      <div className="section-head">
+        <h2 id="resumes-heading">Public resumes</h2>
+        <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
+      </div>
+      <p className="meta">Browse chapter resumes without logging in.</p>
       {/* Show loading first, then an error or an empty message; otherwise render the links. */}
       {loading ? (
         <p role="status">Loading resumes...</p>

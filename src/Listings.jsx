@@ -78,10 +78,12 @@ export default function Listings({ isEditor }) {
   // React: JSX renders the controls and results; map and the conditionals are JavaScript.
   return (
     <section aria-labelledby="internships-heading">
-      <h2 id="internships-heading">Internships</h2>
-      <button type="button" disabled={loading} onClick={() => setRefresh(refresh + 1)}>
-        Refresh listings
-      </button>
+      <div className="section-head">
+        <h2 id="internships-heading">Internships</h2>
+        <button type="button" disabled={loading} onClick={() => setRefresh(refresh + 1)}>
+          Refresh listings
+        </button>
+      </div>
 
       <div className="filters">
         <label>
@@ -115,14 +117,22 @@ export default function Listings({ isEditor }) {
         <ul className="results">
           {visible.map((listing) => (
             <li key={listing.id}>
+              <div className="card-top">
+                <span className="company">{listing.company}</span>
+                <span className="chip">{deadlineLabel(listing.deadline)}</span>
+              </div>
               <h3>{listing.title}</h3>
-              <p>{listing.company}</p>
-              <p>{locationLabels(listing).join(' · ') || 'No city/state provided'} · {listing.work_arrangement}</p>
-              <p>Deadline: {deadlineLabel(listing.deadline)}</p>
-              {/* && shows these labels only for editors when the corresponding condition holds. */}
-              {isEditor && listing.is_archived && <p>Archived</p>}
-              {isEditor && listing.deadline && listing.deadline < today && <p>Expired</p>}
-              <a href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
+              <p className="meta">
+                {locationLabels(listing).join(' · ') || 'No city/state provided'} · {listing.work_arrangement}
+              </p>
+              <div className="card-footer">
+                <div className="chips">
+                  {/* && shows these labels only for editors when the corresponding condition holds. */}
+                  {isEditor && listing.is_archived && <span className="chip">Archived</span>}
+                  {isEditor && listing.deadline && listing.deadline < today && <span className="chip">Expired</span>}
+                </div>
+                <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
+              </div>
             </li>
           ))}
         </ul>
