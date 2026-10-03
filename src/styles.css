@@ -1,4 +1,4 @@
-/* DeltaConnect styles: a dark, minimal theme.
+/* ConnectDelta styles: a dark, minimal theme.
    Purple marks what is active, actionable, or urgent; everything else stays neutral. */
 
 /* ============================================================
@@ -201,7 +201,21 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }
 .company { font-weight: 500; }
 .card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid rgba(255, 255, 255, 0.06); } /* margin-top: auto pins the footer to the card bottom */
-.apply { margin-left: auto; font-size: 0.875rem; font-weight: 600; }
+/* Apply link styled as a purple pill, matching the button shape. */
+.apply {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-left: auto;
+  padding: 0 1rem;
+  border: 1px solid var(--purple-line);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.apply:hover { background: var(--purple-soft); }
 
 /* ============================================================
    Chips: small labels for deadlines and editor status

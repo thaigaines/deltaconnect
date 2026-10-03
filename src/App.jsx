@@ -128,7 +128,7 @@ export default function App() {
       <header className="topbar">
         <div className="container topbar-inner">
           <div className="brand-nav">
-            <a className="brand" href="#/internships">DeltaConnect</a>
+            <a className="brand" href="#/internships">ConnectDelta</a>
             {/* aria-current marks the active link for screen readers and for the CSS highlight. */}
             <nav aria-label="Main navigation">
               <a href="#/internships" aria-current={page !== '#/resumes' ? 'page' : undefined}>Internships</a>
@@ -148,7 +148,7 @@ export default function App() {
       {/* ----- Hero: site name and a tagline that depends on the page ----- */}
       <section className="hero">
         <div className="container">
-          <h1>DeltaConnect</h1>
+          <h1>ConnectDelta</h1>
           <p className="tagline">
             {page === '#/resumes' ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
           </p>

@@ -15,7 +15,7 @@ import ListingForm from './ListingForm.jsx'
 // An empty value means "no filter".
 const arrangementOptions = [
   { value: '', label: 'All' },
-  { value: 'in-person', label: 'In person' },
+  { value: 'in-person', label: 'In-person' },
   { value: 'hybrid', label: 'Hybrid' },
   { value: 'remote', label: 'Remote' },
 ]

@@ -1,4 +1,4 @@
-# DeltaConnect
+# ConnectDelta
 
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
 The React/JavaScript frontend supports invited-account login, member/editor

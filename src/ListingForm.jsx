@@ -127,7 +127,7 @@ export default function ListingForm({ listing, onClose, onSaved }) {
       <label>
         Work arrangement
         <select value={workArrangement} onChange={(event) => setWorkArrangement(event.target.value)}>
-          <option value="in-person">In person</option>
+          <option value="in-person">In-person</option>
           <option value="hybrid">Hybrid</option>
           <option value="remote">Remote</option>
         </select>
