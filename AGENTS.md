@@ -18,9 +18,11 @@ DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, save
 
 ## Implementation
 
-Use JavaScript and pnpm with its lockfile; `package.json` defines dependencies and commands. Split files only when a concrete need makes the code easier to understand.
+Use JavaScript and pnpm with its lockfile; `package.json` defines dependencies and commands. Split files only when a concrete need makes the code easier to understand. Organize source files into commented sections (helpers, state, effects, handlers, render); comments explain purpose and reasoning for students learning JavaScript and React.
 
-Supabase handles authentication, database access, and Storage. Add Python supporting scripts only for concrete tasks such as data imports.
+Supabase handles authentication, database access, and Storage; the React frontend calls it directly, with no separate backend server. Add Python supporting scripts only for concrete tasks such as data imports.
+
+Keep the UI dark and minimal. Use purple only for active, actionable, or urgent elements, and add no decorative extras unless requested.
 
 The SQL setup does not automatically connect the frontend. Use user-scoped access so Supabase enforces permissions. Keep credentials outside source and fixtures. Create listings and initial locations atomically. Validate and clean input before writes; constraints enforce stored values. Reads assume valid records and perform only type conversion and presentation formatting.
 

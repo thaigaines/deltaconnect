@@ -17,6 +17,7 @@ skills-lock.json
 # Editor and operating-system files
 .vscode/
 .idea/
+.vibe-wise
 .DS_Store
 Thumbs.db
 Desktop.ini

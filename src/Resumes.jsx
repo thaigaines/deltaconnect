@@ -1,50 +1,58 @@
-// Lists shared resumes and links to their public PDFs without requiring login.
+// Public resume directory: anyone can view it, no login needed.
+// Loads resume details from the database and links each one to its PDF in Supabase Storage.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 
 export default function Resumes() {
-  // React: state stores the fetched rows and determines which message is displayed.
+  // ---------- State ----------
+  // useState returns [current value, setter]. Calling a setter re-renders the component.
   const [resumes, setResumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  // A counter whose only job is to change; changing it reruns the load effect below.
   const [refresh, setRefresh] = useState(0)
 
-  // React: this effect fetches on mount or refresh; async/await inside it is JavaScript.
+  // ---------- Load resumes ----------
+  // Runs when the page first appears and again whenever refresh changes.
   useEffect(() => {
+    // If a newer load starts or the page is left before this request finishes,
+    // the cleanup sets cancelled so the outdated response is ignored.
     let cancelled = false
 
     async function loadResumes() {
       setLoading(true)
       setErrorMessage('')
-      // Anonymous visitors can read these columns, but not the user_id column.
+
+      // Visitors who aren't logged in may read only these three columns (not user_id).
+      // Newest uploads first; object_path breaks ties so the order is stable.
       const { data, error } = await supabase
         .from('resume')
         .select('object_path,original_filename,uploaded_at')
         .order('uploaded_at', { ascending: false })
         .order('object_path')
 
-      // Ignore a late response after navigation or a newer refresh.
       if (cancelled) return
-      // If the query fails, store its error; otherwise replace the resume list.
       if (error) setErrorMessage(error.message)
       else setResumes(data)
       setLoading(false)
     }
 
     loadResumes()
-    // Cleanup makes the cancelled check ignore responses from this older effect.
     return () => { cancelled = true }
   }, [refresh])
 
-  // React: JSX describes the page; the conditional branches and map use JavaScript.
+  // ---------- Render ----------
   return (
     <section aria-labelledby="resumes-heading">
+      {/* ----- Heading and refresh ----- */}
       <div className="section-head">
         <h2 id="resumes-heading">Public resumes</h2>
         <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
       </div>
       <p className="meta">Browse chapter resumes without logging in.</p>
-      {/* Show loading first, then an error or an empty message; otherwise render the links. */}
+
+      {/* ----- Results ----- */}
+      {/* The ternary chain picks one: loading message, error, empty message, or the list. */}
       {loading ? (
         <p role="status">Loading resumes...</p>
       ) : errorMessage ? (
@@ -54,7 +62,7 @@ export default function Resumes() {
       ) : (
         <ul className="results">
           {resumes.map((resume) => {
-            // This builds the public URL; it doesn't fetch or check the PDF.
+            // getPublicUrl only builds the link text; it doesn't download or check the PDF.
             const { data } = supabase.storage.from('dsp-public-resumes').getPublicUrl(resume.object_path)
             return (
               <li key={resume.object_path}>

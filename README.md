@@ -3,7 +3,9 @@
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
 The React/JavaScript frontend supports invited-account login, member/editor
 internship browsing with search and filters, and a public resume directory at
-`#/resumes`. Editor forms and resume uploads are deferred.
+`#/resumes`. Editors can add listings (with locations), edit listing details, and
+archive or restore listings. Editing locations after creation and resume uploads
+are deferred.
 
 This README defines the product and database rules. The SQL migrations in
 `supabase/migrations/` implement the database and are the source for column details.

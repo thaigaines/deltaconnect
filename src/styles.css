@@ -1,16 +1,21 @@
-/* Dark, minimal DeltaConnect theme: purple marks what is active or actionable. */
+/* DeltaConnect styles: a dark, minimal theme.
+   Purple marks what is active, actionable, or urgent; everything else stays neutral. */
+
+/* ============================================================
+   Theme variables
+   Change a color here and it updates everywhere var(--name) is used.
+   ============================================================ */
 :root {
-  --bg: #0a0a0c;
-  --surface: #111115;
-  --surface-hover: #15151a;
-  --line: rgba(255, 255, 255, 0.08);
-  --text: #f2f2f5;
-  --muted: #a1a1ad;
-  --faint: #7d7d89;
-  --purple: #a685ff;
-  --purple-soft: rgba(166, 133, 255, 0.14);
-  --purple-line: rgba(166, 133, 255, 0.4);
-  --mono: 'Geist Mono', ui-monospace, monospace;
+  --bg: #0a0a0c;                            /* page background */
+  --surface: #111115;                       /* cards and panels */
+  --surface-hover: #15151a;                 /* card background on hover */
+  --line: rgba(255, 255, 255, 0.08);        /* subtle borders */
+  --text: #f2f2f5;                          /* main text */
+  --muted: #a1a1ad;                         /* secondary text */
+  --faint: #7d7d89;                         /* placeholders */
+  --purple: #a685ff;                        /* accent */
+  --purple-soft: rgba(166, 133, 255, 0.14); /* accent backgrounds */
+  --purple-line: rgba(166, 133, 255, 0.4);  /* accent borders */
   font-family: 'Geist', system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -19,13 +24,16 @@
   -webkit-font-smoothing: antialiased;
 }
 
-* { box-sizing: border-box; }
+/* ============================================================
+   Base elements
+   ============================================================ */
+* { box-sizing: border-box; } /* width includes padding and border */
 body { margin: 0; }
 h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; font-weight: 600; }
 a { color: var(--purple); text-underline-offset: 0.2em; }
-:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
-[role="alert"] { color: #ff9fae; }
-[role="status"] { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; } /* keyboard focus ring */
+[role="alert"] { color: #ff9fae; }       /* error messages */
+[role="status"] { color: var(--muted); } /* loading messages */
 
 /* Shared page width for the top bar, hero, and content. */
 .container {
@@ -34,11 +42,13 @@ a { color: var(--purple); text-underline-offset: 0.2em; }
   padding-inline: 1.5rem;
 }
 
-/* Top bar: wordmark and navigation on the left, account on the right. */
+/* ============================================================
+   Top bar: name and navigation on the left, account on the right
+   ============================================================ */
 .topbar { border-bottom: 1px solid var(--line); }
 .topbar-inner, .brand-nav, .account {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* items move to a new line on narrow screens */
   align-items: center;
 }
 .topbar-inner { justify-content: space-between; gap: 1rem; padding-block: 1rem; }
@@ -55,21 +65,26 @@ nav a {
   transition: color 0.15s, background-color 0.15s;
 }
 nav a:hover { color: var(--text); }
-nav a[aria-current="page"] { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+nav a[aria-current="page"] { color: var(--text); background: rgba(255, 255, 255, 0.06); } /* current page */
 .account { gap: 0.75rem; color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
 
-/* Hero: one large headline over a still purple glow. */
+/* ============================================================
+   Hero: large site name over a faint purple glow
+   ============================================================ */
 .hero { background: radial-gradient(45rem 22rem at 18% 0%, rgba(166, 133, 255, 0.16), transparent 70%); }
 .hero .container { padding-block: 5.5rem 3.5rem; }
 .hero h1 {
   max-width: 52rem;
   margin: 0;
-  font-size: clamp(2.5rem, 6vw, 4.25rem);
+  font-size: clamp(2.5rem, 6vw, 4.25rem); /* scales with screen width between the two limits */
   line-height: 1.02;
   letter-spacing: -0.045em;
 }
 .tagline { margin: 1rem 0 0; color: var(--muted); font-size: 1.125rem; }
 
+/* ============================================================
+   Page sections: heading row with an action button
+   ============================================================ */
 main { padding-bottom: 6rem; }
 .section-head {
   display: flex;
@@ -80,11 +95,14 @@ main { padding-bottom: 6rem; }
   margin-bottom: 1.25rem;
 }
 .section-head h2 { margin: 0; font-size: 1.5rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
-/* Forms and buttons. */
-form, label { display: grid; gap: 0.375rem; }
-label { color: var(--muted); font-size: 0.75rem; font-weight: 500; }
-input, select, button { font: inherit; min-height: 2.75rem; }
+/* ============================================================
+   Forms and buttons
+   ============================================================ */
+form, label, .filter-group { display: grid; gap: 0.375rem; }
+label, .filter-group { color: var(--muted); font-size: 0.75rem; font-weight: 500; }
+input, select, button { font: inherit; min-height: 2.75rem; } /* 44px: comfortable touch target */
 input, select {
   width: 100%;
   min-width: 0;
@@ -108,25 +126,38 @@ button {
   transition: background-color 0.15s, border-color 0.15s;
 }
 button:hover:not(:disabled) { border-color: var(--purple-line); background: var(--purple-soft); }
-button[type="submit"] { color: var(--bg); background: var(--purple); border-color: var(--purple); font-weight: 600; }
+button[type="submit"] { color: var(--bg); background: var(--purple); border-color: var(--purple); font-weight: 600; } /* primary button */
 button[type="submit"]:hover:not(:disabled) { background: #b89cff; }
 button:disabled { opacity: 0.6; cursor: wait; }
 
-.login-card {
-  max-width: 26rem;
+/* Button group: the selected button (aria-pressed="true") gets the purple highlight. */
+.button-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.button-group button[aria-pressed="true"] { color: var(--purple); background: var(--purple-soft); border-color: var(--purple-line); }
+
+/* Boxed panels: the login card and the add-listing form. */
+.panel, .login-card {
   padding: 2rem;
   border: 1px solid var(--line);
   border-radius: 1.125rem;
   background: var(--surface);
 }
+.panel { margin-bottom: 1rem; }
+.login-card { max-width: 26rem; }
 .login-card h2 { margin: 0 0 0.5rem; font-size: 1.375rem; }
 .login-card p { margin: 0; color: var(--muted); }
 .login-card form { margin-top: 1.5rem; gap: 1rem; }
 
-/* Filter panel: search grows; the selects stay compact. */
+/* Add/edit listing form (inside .panel when adding, inside the card when editing). */
+.listing-form { gap: 1rem; }
+.listing-form h3 { margin: 0; font-size: 1.25rem; }
+.checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+.checkbox input { width: auto; min-height: 0; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* Filter panel: search takes twice the location dropdown's width; the button group takes what it needs. */
 .filters {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
   gap: 0.75rem;
   padding: 0.875rem;
   border: 1px solid var(--line);
@@ -134,7 +165,10 @@ button:disabled { opacity: 0.6; cursor: wait; }
   background: var(--surface);
 }
 
-/* Cards for listings and resumes. */
+/* ============================================================
+   Cards: used by both the internships and resumes lists
+   ============================================================ */
+/* auto-fill fits as many 21rem-wide columns as the screen allows (one on phones). */
 .results {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
@@ -151,7 +185,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
   border: 1px solid var(--line);
   border-radius: 1.125rem;
   background: var(--surface);
-  overflow-wrap: anywhere;
+  overflow-wrap: anywhere; /* long URLs or names wrap instead of overflowing */
   transition: border-color 0.15s, transform 0.15s, background-color 0.15s;
 }
 .results > li:hover { border-color: var(--purple-line); background: var(--surface-hover); transform: translateY(-2px); }
@@ -166,23 +200,29 @@ button:disabled { opacity: 0.6; cursor: wait; }
 }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }
 .company { font-weight: 500; }
-.card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid rgba(255, 255, 255, 0.06); } /* margin-top: auto pins the footer to the card bottom */
 .apply { margin-left: auto; font-size: 0.875rem; font-weight: 600; }
 
-/* Small labels for deadlines and editor status. */
+/* ============================================================
+   Chips: small labels for deadlines and editor status
+   ============================================================ */
 .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .chip {
   padding: 0.25rem 0.625rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   color: var(--muted);
-  font-family: var(--mono);
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
 }
+/* Added by Listings.jsx when a deadline is within 7 days. */
+.chip.urgent { color: var(--purple); background: var(--purple-soft); border-color: var(--purple-line); }
 
+/* ============================================================
+   Phones (screens narrower than 40rem, about 640px)
+   ============================================================ */
 @media (max-width: 40rem) {
   .hero .container { padding-block: 3.5rem 2.5rem; }
-  .filters { grid-template-columns: 1fr; }
+  .filters { grid-template-columns: 1fr; } /* stack the filters */
 }
