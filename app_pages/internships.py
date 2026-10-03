@@ -3,6 +3,7 @@ import streamlit as st
 from database import load_public_internships
 from logic import WORK_ARRANGEMENTS, filter_listings
 
+# Basic div styling
 st.html("""
 <style>
 .st-key-main {
@@ -23,7 +24,7 @@ def main():
     with st.container(horizontal_alignment="center"):
         st.title("DeltaConnect", anchor=False, text_alignment="center")
         st.markdown("Your next opportunity starts here.", text_alignment="center")
-        st.caption("Internships curated by our chapter", text_alignment="center")
+        st.caption("Internships curated by our chapter, for our chapter", text_alignment="center")
     try:
         internships = load_public_internships()
     except OSError as error:

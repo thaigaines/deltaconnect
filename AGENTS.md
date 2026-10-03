@@ -3,41 +3,35 @@
 ## Working approach
 
 - The user writes application logic for practice. Focus agent edits on tedious tasks, formatting, and small explicitly requested changes; provide advice instead of substantial implementations unless requested.
-- Evaluate proposals independently. Push back on choices you disagree with, explain tradeoffs, and recommend an alternative. Use primary-source research when evidence could change the decision. Respect the user's informed final choice.
+- Evaluate proposals independently. Explain tradeoffs and use primary-source research when evidence could change a decision. Respect the user's informed final choice.
 - Keep code minimal and readable for student maintainers. Add dependencies or abstractions only for concrete requirements.
-- Preserve user changes and stay within scope. Get confirmation before pushing, deploying, publishing, deleting material files, or changing shared systems.
+- Preserve user changes and scope. Get confirmation before pushing, deploying, publishing, deleting material files, or changing shared systems.
 - Prefer manual or temporary checks. Add permanent tests only when requested or agreed. Report changes, verification, and limitations.
 
-## MVP
+## Product and database rules
 
-A public internship board for one Delta Sigma Pi chapter. Visitors browse, search, filter, and follow application links without login. Approved committee editors create, archive, and restore unchanged listings; all have equal permissions. New listings publish immediately.
+Read `supabase/README.md` before changing listing behavior, authentication, roles, resumes, or database access. It is the authoritative source for current rules. `SCHEMA.md` describes columns; migrations implement the database. Distinguish intended rules, local verification, and hosted state.
 
-Correct errors by archiving the old listing and creating a new one. Keep listing content unchanged after creation. Defer multi-chapter support, student accounts, saved listings, application tracking, notifications, scraping, and deployment decisions.
+DeltaConnect serves one Delta Sigma Pi chapter. Internship browsing requires approved membership; editors are approved members with additional permissions. Resumes are publicly downloadable. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 
 ## Implementation
 
-Use Streamlit and plain functions:
+The current application uses Streamlit and plain Python functions:
 
-- `app.py`: shared configuration and navigation; `app_pages/`: page UI and input.
+- `app.py`: configuration and navigation; `app_pages/`: UI and input.
 - `logic.py`: search, filtering, sorting, and visibility.
-- `database.py`: loading, persistence, and conversion to the common application representation.
+- `database.py`: persistence, type conversion, and location-label formatting.
 
-Read `SCHEMA.md` before changing listing fields, storage, authentication, or committee operations. It defines the planned normalized tables and write restrictions, not implemented functionality. CSV fixtures mirror listing and location tables; production storage uses Supabase. Format child rows as location labels at the storage boundary. Create listings and locations atomically.
+The SQL setup does not automatically connect the Python app. Use user-scoped access so Supabase enforces permissions. Keep credentials outside source and fixtures. Create listings and initial locations atomically. Validate and clean input before writes; constraints enforce stored values. Reads assume valid records and perform only type conversion and presentation formatting.
 
-The reader trusts cleaned, valid records. Keep only transport-type conversion and presentation formatting on reads; validate and clean during imports or committee input, with database constraints enforcing stored values.
+## Listing presentation
 
-## Listing behavior
+- Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate.
+- Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display missing deadlines as “No deadline provided.”
+- Review undated listings weekly. Require explicit confirmation for duplicate application URLs.
 
-- Limit locations to the US. Store city/state as defined in `SCHEMA.md` and generate display labels. Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate from geographic eligibility.
-- Public visibility requires no manual archival and an absent deadline or deadline on/after today in `America/New_York`. Enforce this before public retrieval; compute expiration on reads.
-- Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display absent deadlines as “No deadline provided,” not rolling applications.
-- Retain expired and archived records for committee access. Restoring only clears archival; an expired listing remains hidden.
-- Warn on duplicate application URLs and allow an explicit override. Review undated listings weekly.
+## Verification
 
-## Access and validation
+Check invalid fields/URLs, empty/multiple locations, duplicate overrides, Eastern-date boundaries, missing deadlines, filtering, sorting, edits, and archive/restore. Confirm regular members cannot retrieve hidden listings or their locations, while editors can. Verify denied unapproved writes, editor membership revocation, creation rollback, owner-only resume changes, public downloads, exact Storage paths, timestamps, and file/database failure cleanup.
 
-Supabase Auth identifies users; owner-approved membership grants editor access. Enforce authorization in database policies, protect audit fields and hidden location rows, and use user-scoped committee access. Keep secrets outside source and fixtures. Revoke approval when editors leave; retain accounts initially and preserve listings if account deletion is later supported.
-
-Check affected cases: invalid required fields/URLs, empty or multiple locations, missing deadlines, Eastern date boundaries, archive/restore, duplicate overrides, filtering, and sorting. For committee operations, verify denied anonymous/unapproved writes and content edits, approved creation/archive/restore, and rollback of failed listing/location creation.
-
-Keep README setup concise and use DeltaConnect consistently.
+Keep setup documentation concise and use DeltaConnect consistently.

@@ -1,6 +1,6 @@
 # DeltaConnect schema
 
-Planned Supabase schema; not yet implemented. US locations use separate city/state rows for filtering and normalization. No country or postal-code column.
+Supabase schema implemented by the repository migrations; hosted application status is unverified. Read `supabase/README.md` for authoritative access and product rules. US locations use separate city/state rows for filtering and normalization. No country or postal-code column.
 
 “None” means no declared default. Defaults apply when a column is omitted, not when explicit NULL is supplied.
 
@@ -14,7 +14,7 @@ Planned Supabase schema; not yet implemented. US locations use separate city/sta
 | `application_url` | `text` | No | None | No | Absolute HTTP(S) URL |
 | `work_arrangement` | `text` | No | None | No | Check: `in-person`, `hybrid`, `remote` |
 | `deadline` | `date` | Yes | None (NULL if omitted) | No | Employer closing date |
-| `is_archived` | `boolean` | No | `false` | No | Only changeable field |
+| `is_archived` | `boolean` | No | `false` | No | Editors may archive and restore; listing content is also editable |
 | `created_at` | `timestamptz` | No | `now()` | No | Database-stamped |
 | `created_by` | `uuid` | No | `auth.uid()` | No | FK to `auth.users(id)`; `ON DELETE RESTRICT` |
 
@@ -35,14 +35,27 @@ Generate display labels such as `Boston, MA`. Zero rows means no city/state spec
 
 | Column | Type | Nullable | Default | Unique | Rule |
 | --- | --- | --- | --- | --- | --- |
+| `user_id` | `uuid` | No | None | Yes | Primary key; FK to `private.approved_member(user_id)`; `ON DELETE CASCADE` |
+
+## `private.approved_member`
+
+| Column | Type | Nullable | Default | Unique | Rule |
+| --- | --- | --- | --- | --- | --- |
 | `user_id` | `uuid` | No | None | Yes | Primary key; FK to `auth.users(id)`; `ON DELETE CASCADE` |
 
-## Essential rules
+Only the owner or an authorized administrator manages approvals. Members cannot approve themselves. Every editor must be an approved member; removing membership also removes editor approval.
 
-- RLS limits base-table access to approved editors. A restricted public-read function returns public listing fields and location labels, excluding audit fields and hidden listings.
-- Public visibility: not archived, and deadline absent or on/after today in `America/New_York`.
-- Create each listing and its locations in one transaction. Enforce unchanged content and locations after creation; only archival status may change.
-- Correct errors by archiving and creating a new listing with a new ID. Restore only unchanged listings. No versions or edit workflow.
-- Database stamping must prevent forged creation fields; defaults alone do not enforce this. Imports preserve fixture IDs and use the approved importing account. Warn on duplicate URLs and allow an explicit override. Ordinary committee operations never delete listings.
+## `public.resume`
+
+| Column | Type | Nullable | Default | Unique | Rule |
+| --- | --- | --- | --- | --- | --- |
+| `user_id` | `uuid` | No | `auth.uid()` | Yes | Primary key; FK to `auth.users(id)`; `ON DELETE CASCADE` |
+| `object_path` | `text` | No | None | Yes | Exactly `<user-id>/resume.pdf` in the public `dsp-public-resumes` bucket |
+| `original_filename` | `text` | No | None | No | Nonblank; display only |
+| `uploaded_at` | `timestamptz` | No | `now()` | No | Database-stamped; refreshed on replacement |
+
+Resume metadata and public file downloads are available to everyone. Anonymous users cannot select the `user_id` column, but the UUID remains visible in `object_path`. Approved members may upload, replace, and delete only their own resume; editors cannot change another member's resume. The bucket is PDF-only with a 500,000-byte limit.
+
+File uploads and metadata writes are not one atomic transaction. On replacement, overwrite the same file path, then update the metadata to refresh its timestamp; handle failures and orphaned files. Deleting a metadata row or account does not automatically remove the stored PDF, so provide a cleanup workflow. Revoking membership does not unpublish an existing resume.
 
 Location design follows [PostgreSQL array guidance](https://www.postgresql.org/docs/current/arrays.html#ARRAYS-SEARCHING); key rules follow [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).

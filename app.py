@@ -11,7 +11,7 @@ st.set_page_config(
 page = st.navigation(
     [
         st.Page("app_pages/internships.py", title="Internships", icon=":material/work:"),
-        st.Page("app_pages/editor_login.py", title="Editor login", icon=":material/login:"),
+        st.Page("app_pages/committee_login.py", title="Committee login", icon=":material/login:"),
     ],
     position="top",
 )
