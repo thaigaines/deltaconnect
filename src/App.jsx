@@ -155,7 +155,7 @@ export default function App() {
             <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
           ) : (
             <div>
-              <p>This account does not have internship access. Contact the owner.</p>
+              <p>This account does not have internship access. Email <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> for access.</p>
               <button type="button" onClick={refreshAccess}>Refresh access</button>
             </div>
           )
