@@ -1,8 +1,8 @@
 // Public resume directory: anyone can view it, no login needed.
-// Loads resume details from the database and links each one to its PDF in Supabase Storage.
+// Loads resume details and shows each PDF as a preview that opens the full file when clicked.
 // Signed-in members also get an Add/Edit resume button for their own resume.
 import { useEffect, useState } from 'react'
-import { supabase } from './supabase.js'
+import { supabase, resumeBucket, resumePath } from './supabase.js'
 import ResumeForm from './ResumeForm.jsx'
 
 // ============================================================
@@ -12,7 +12,6 @@ import ResumeForm from './ResumeForm.jsx'
 // ============================================================
 export default function Resumes({ userId, isMember }) {
   // ---------- State ----------
-  // useState returns [current value, setter]. Calling a setter re-renders the component.
   const [resumes, setResumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -51,9 +50,9 @@ export default function Resumes({ userId, isMember }) {
   }, [refresh])
 
   // ---------- Derived values ----------
-  // Every member's file lives at '<user-id>/resume.pdf', so the member's own row can be found
+  // Every member's file has a fixed path, so the member's own row can be found
   // in the list already loaded. undefined means they haven't uploaded one yet.
-  const myResume = resumes.find((resume) => resume.object_path === `${userId}/resume.pdf`)
+  const myResume = resumes.find((resume) => resume.object_path === resumePath(userId))
 
   // ---------- Event handlers ----------
   // After a save: close the form and reload the list so the change shows.
@@ -99,15 +98,20 @@ export default function Resumes({ userId, isMember }) {
       ) : (
         <ul className="results">
           {resumes.map((resume) => {
-            // getPublicUrl only builds the link text; it doesn't download or check the PDF.
-            const { data } = supabase.storage.from('dsp-public-resumes').getPublicUrl(resume.object_path)
+            // getPublicUrl only builds the URL; it doesn't download or check the PDF.
+            const { data } = supabase.storage.from(resumeBucket).getPublicUrl(resume.object_path)
+            const name = `${resume.first_name} ${resume.last_name}`
             return (
               <li key={resume.object_path}>
-                {/* The browser's built-in PDF viewer draws the preview inside the iframe. */}
-                <iframe className="resume-preview" src={data.publicUrl} title={`${resume.first_name} ${resume.last_name} resume preview`} />
-                <h3>{resume.first_name} {resume.last_name}</h3>
+                {/* The browser's PDF viewer draws the preview; the #settings ask it to fit the page
+                    with no toolbar. The link sits on top of the preview, so a click anywhere opens the
+                    PDF in a new tab. The preview itself is skipped by Tab and screen readers. */}
+                <div className="resume-preview">
+                  <iframe src={`${data.publicUrl}#toolbar=0&navpanes=0&view=Fit`} title={`${name} resume preview`} tabIndex={-1} aria-hidden="true" />
+                  <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${name}'s resume (PDF)`} />
+                </div>
+                <h3>{name}</h3>
                 <p className="meta">{resume.major}</p>
-                <a href={data.publicUrl} target="_blank" rel="noopener noreferrer">{resume.original_filename} (PDF)</a>
               </li>
             )
           })}

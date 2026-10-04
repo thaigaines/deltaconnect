@@ -76,16 +76,16 @@ export default function ListingForm({ listing, onClose, onSaved }) {
       setErrorMessage('Title and company are required.')
       return
     }
+    // Adding only: turn the locations text into rows, and stop if any entry is incomplete.
+    const parsed = isNew ? parseLocations(locations) : []
+    if (parsed.some((location) => !location.city || !location.state)) {
+      setErrorMessage('Write each location as City, ST and separate them with semicolons.')
+      return
+    }
 
     let error
     setBusy(true)
     if (isNew) {
-      const parsed = parseLocations(locations)
-      if (parsed.some((location) => !location.city || !location.state)) {
-        setBusy(false)
-        setErrorMessage('Write each location as City, ST and separate them with semicolons.')
-        return
-      }
       // 23505 is the database's "duplicate" error code. Ask the editor, then retry
       // with the duplicate override if they confirm.
       error = await createListing(fields, parsed, false)

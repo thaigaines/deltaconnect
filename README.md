@@ -47,7 +47,7 @@ spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Access
 
-RLS is enabled on all five tables. Ordinary clients use these permissions:
+RLS is enabled on all five tables.
 
 Only owner-allowed accounts are intended to log in for internship access. Provision
 each account with an `approved_member` row before its first login, and disable
@@ -58,6 +58,8 @@ These hosted settings and approvals must be verified separately.
 
 The resume directory and PDF downloads belong on a separate public page and
 require no login. Uploading and managing a resume still requires an approved account.
+
+Ordinary clients use these permissions:
 
 | Resource | Read | Write |
 | --- | --- | --- |

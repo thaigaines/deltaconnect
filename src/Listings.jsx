@@ -39,17 +39,17 @@ function easternToday() {
   return `${part('year')}-${part('month')}-${part('day')}`
 }
 
-// Number of days from today (Eastern) until the deadline.
+// Number of days from today until the deadline; both are 'YYYY-MM-DD' strings.
 // Today -> 0, tomorrow -> 1, already passed -> negative (only editors see those listings).
-// Callers must check that a deadline exists first; this function expects a 'YYYY-MM-DD' string.
-function daysLeft(deadline) {
+// Callers must check that a deadline exists first.
+function daysLeft(deadline, today) {
   // Both dates become midnight UTC. Using UTC for both means daylight-saving changes
   // can't make a "day" 23 or 25 hours long, so the division below is always a whole number.
   const end = new Date(`${deadline}T00:00:00Z`)
-  const today = new Date(`${easternToday()}T00:00:00Z`)
+  const start = new Date(`${today}T00:00:00Z`)
   // Subtracting two Dates gives milliseconds; divide by the milliseconds in one day.
   const msPerDay = 1000 * 60 * 60 * 24
-  return Math.round((end - today) / msPerDay)
+  return Math.round((end - start) / msPerDay)
 }
 
 // Chip text for a listing that closes soon, e.g. 0 -> 'Closes today', 3 -> '3 days left'.
@@ -74,8 +74,6 @@ function deadlineLabel(deadline) {
 // ============================================================
 export default function Listings({ isEditor }) {
   // ---------- State ----------
-  // useState returns [current value, setter]. Calling a setter re-renders the component.
-
   // Data from Supabase and the request status.
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -94,8 +92,7 @@ export default function Listings({ isEditor }) {
   const [form, setForm] = useState(null)
 
   // ---------- Load listings ----------
-  // useEffect runs after the component appears on screen, and again whenever a value
-  // in its dependency list ([refresh]) changes.
+  // Runs when the page first appears and again whenever refresh changes.
   useEffect(() => {
     // If this effect is replaced (refresh clicked again, or the page is left) before the
     // request finishes, the cleanup sets cancelled so the old response is ignored.
@@ -114,8 +111,8 @@ export default function Listings({ isEditor }) {
         .order('id', { ascending: true })
 
       if (cancelled) return
-      setListings(error ? [] : data)
-      setErrorMessage(error ? error.message : '')
+      if (error) setErrorMessage(error.message)
+      else setListings(data)
       setLoading(false)
     }
 
@@ -138,6 +135,10 @@ export default function Listings({ isEditor }) {
       && (!location || labels.includes(location))
       && (!arrangement || listing.work_arrangement === arrangement)
   })
+
+  // Today's Eastern date, worked out once so every card compares against the same day.
+  const today = easternToday()
+
   // ---------- Event handlers ----------
   // After a save: close the form and reload the list so the change shows.
   function handleSaved() {
@@ -208,7 +209,7 @@ export default function Listings({ isEditor }) {
           {visible.map((listing) => {
             // Only call daysLeft when there is a deadline; then a listing is urgent
             // if it closes today or within the next 7 days.
-            const days = listing.deadline ? daysLeft(listing.deadline) : null
+            const days = listing.deadline ? daysLeft(listing.deadline, today) : null
             const urgent = days !== null && days >= 0 && days <= 7
 
             // While this listing is being edited, its card shows the edit form instead.

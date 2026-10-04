@@ -63,6 +63,9 @@ export default function App() {
   // doesn't reset access or reload the page's content.
   const userId = session?.user.id
 
+  // Whether the public resume directory is showing; everything else is the internships page.
+  const isResumesPage = page === '#/resumes'
+
   // Permissions: when the user changes or accessCheck is bumped by refreshAccess, clear the
   // old result (so one account never sees another's access), then ask the database whether
   // this account is a member/editor.
@@ -131,8 +134,8 @@ export default function App() {
             <a className="brand" href="#/internships">DeltaConnect</a>
             {/* aria-current marks the active link for screen readers and for the CSS highlight. */}
             <nav aria-label="Main navigation">
-              <a href="#/internships" aria-current={page !== '#/resumes' ? 'page' : undefined}>Internships</a>
-              <a href="#/resumes" aria-current={page === '#/resumes' ? 'page' : undefined}>Resumes</a>
+              <a href="#/internships" aria-current={!isResumesPage ? 'page' : undefined}>Internships</a>
+              <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
             </nav>
           </div>
           {/* a && b renders b only when a is truthy: the account area appears only while signed in. */}
@@ -150,7 +153,7 @@ export default function App() {
         <div className="container">
           <h1>DeltaConnect</h1>
           <p className="tagline">
-            {page === '#/resumes' ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
+            {isResumesPage ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
           </p>
         </div>
       </section>
@@ -162,7 +165,7 @@ export default function App() {
             2. Still checking for a saved session -> "Checking login..."
             3. Signed in -> access checks, then Listings
             4. Otherwise -> login form */}
-        {page === '#/resumes' ? (
+        {isResumesPage ? (
           // key resets the page (closing any open form) when a different account signs in.
           <Resumes key={userId} userId={userId} isMember={permissions?.is_member === true} />
         ) : loadingSession ? (
@@ -208,8 +211,8 @@ export default function App() {
           </section>
         )}
 
-        {/* Login and sign-out errors, shown on the internships page only. */}
-        {page !== '#/resumes' && errorMessage && <p role="alert">{errorMessage}</p>}
+        {/* Login and sign-out errors. Sign out is available on both pages, so this shows on both. */}
+        {errorMessage && <p role="alert">{errorMessage}</p>}
       </main>
     </>
   )

@@ -1,12 +1,13 @@
 // Add/edit resume form for members, shown in a panel above the resume directory.
-// With no resume prop it adds the member's first resume; with a resume it replaces it.
+// With no resume prop it adds the member's first resume; with a resume it edits the details
+// and, if a new PDF is chosen, replaces the file.
 // The database and Storage access rules (RLS) still decide whether each write is allowed.
 import { useState } from 'react'
-import { supabase } from './supabase.js'
+import { supabase, resumeBucket, resumePath } from './supabase.js'
 
 // ============================================================
 // Component
-// userId: the signed-in member's id; their file always lives at `${userId}/resume.pdf`.
+// userId: the signed-in member's id; their file always lives at resumePath(userId).
 // resume: the member's current resume row, or null if they haven't uploaded one.
 // onClose: called when the member clicks Cancel.
 // onSaved: called after a successful save so the directory can reload.
@@ -32,13 +33,14 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
     setErrorMessage('')
 
     // Validate before writing; these match the bucket's limits and the table's filename rule.
+    // A file is required when adding. When editing, no file means "keep the current one".
     const filename = file?.name.trim()
-    if (!file || file.type !== 'application/pdf' || !filename) {
+    if (isNew && !file) {
       setErrorMessage('Choose a PDF file.')
       return
     }
-    if (file.size > 500000) {
-      setErrorMessage('The PDF must be 500 KB or smaller.')
+    if (file && (file.type !== 'application/pdf' || !filename || file.size > 500000)) {
+      setErrorMessage('Choose a PDF file of 500 KB or smaller.')
       return
     }
     // Clean input before writing: trim the text fields, which the table requires to be non-blank.
@@ -48,32 +50,33 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
       return
     }
 
-    // Every member has one file at a fixed path. upsert: true overwrites an existing
-    // file there, so a replacement never leaves a gap with no resume.
-    const path = `${userId}/resume.pdf`
-    const storage = supabase.storage.from('dsp-public-resumes')
+    const path = resumePath(userId)
+    const storage = supabase.storage.from(resumeBucket)
+    // error holds the first failure; each step below runs only if nothing has failed yet.
+    let error = null
     setBusy(true)
-    const upload = await storage.upload(path, file, { upsert: true, contentType: 'application/pdf' })
-    if (upload.error) {
-      setBusy(false)
-      setErrorMessage(upload.error.message)
-      return
+
+    // Upload first (only if a file was chosen). upsert: true overwrites the member's existing
+    // file at the same path, so a replacement never leaves a gap with no resume.
+    if (file) {
+      const upload = await storage.upload(path, file, { upsert: true, contentType: 'application/pdf' })
+      error = upload.error
     }
 
-    // Upload first, then save the details. The database sets uploaded_at on insert and update.
-    const fields = { ...details, object_path: path, original_filename: filename }
-    const { error } = isNew
-      ? await supabase.from('resume').insert({ ...fields, user_id: userId })
-      : await supabase.from('resume').update(fields).eq('user_id', userId)
+    // Then save the details; a new file also records its filename.
+    // The database sets uploaded_at on every insert and update.
+    if (!error) {
+      const fields = file ? { ...details, object_path: path, original_filename: filename } : details
+      const result = isNew
+        ? await supabase.from('resume').insert({ ...fields, user_id: userId })
+        : await supabase.from('resume').update(fields).eq('user_id', userId)
+      error = result.error
 
-    // A failed first upload would leave a file with no directory entry, so remove it.
-    // Skip this for 23505 (row already exists, e.g. added in another tab): that file is live.
-    if (error && isNew && error.code !== '23505') {
-      const cleanup = await storage.remove([path])
-      if (cleanup.error) {
-        setBusy(false)
-        setErrorMessage(`${error.message} The uploaded file could not be removed; please try again.`)
-        return
+      // A failed first save would leave a file with no directory entry, so remove it.
+      // Skip this for 23505 (row already exists, e.g. added in another tab): that file is live.
+      if (error && isNew && error.code !== '23505') {
+        const cleanup = await storage.remove([path])
+        if (cleanup.error) error = { message: `${error.message} The uploaded file could not be removed; please try again.` }
       }
     }
     setBusy(false)
@@ -92,8 +95,8 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
 
       {/* accept filters the file picker to PDFs; it's a convenience, not validation. */}
       <label>
-        PDF file (500 KB max)
-        <input type="file" accept="application/pdf" required
+        {isNew ? 'PDF file (500 KB max)' : 'Replace PDF (optional, 500 KB max)'}
+        <input type="file" accept="application/pdf" required={isNew}
           onChange={(event) => setFile(event.target.files[0] ?? null)} />
       </label>
 
