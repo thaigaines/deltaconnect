@@ -32,11 +32,11 @@ export default function Resumes({ userId, isMember }) {
       setLoading(true)
       setErrorMessage('')
 
-      // Visitors who aren't logged in may read only these three columns (not user_id).
+      // Visitors who aren't logged in may read only these columns (not user_id).
       // Newest uploads first; object_path breaks ties so the order is stable.
       const { data, error } = await supabase
         .from('resume')
-        .select('object_path,original_filename,uploaded_at')
+        .select('object_path,original_filename,uploaded_at,first_name,last_name,major')
         .order('uploaded_at', { ascending: false })
         .order('object_path')
 
@@ -103,6 +103,10 @@ export default function Resumes({ userId, isMember }) {
             const { data } = supabase.storage.from('dsp-public-resumes').getPublicUrl(resume.object_path)
             return (
               <li key={resume.object_path}>
+                {/* The browser's built-in PDF viewer draws the preview inside the iframe. */}
+                <iframe className="resume-preview" src={data.publicUrl} title={`${resume.first_name} ${resume.last_name} resume preview`} />
+                <h3>{resume.first_name} {resume.last_name}</h3>
+                <p className="meta">{resume.major}</p>
                 <a href={data.publicUrl} target="_blank" rel="noopener noreferrer">{resume.original_filename} (PDF)</a>
               </li>
             )

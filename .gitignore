@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Supabase CLI link state (project ref and local cache)
+supabase/.temp/
+
 # JavaScript dependencies and build output
 node_modules/
 dist/

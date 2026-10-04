@@ -19,6 +19,10 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
   // A file input can't be "controlled" like a text input (browsers don't let code set
   // its value), so we only read from it in onChange.
   const [file, setFile] = useState(null)
+  // Text fields start from the current resume when editing, or empty when adding.
+  const [firstName, setFirstName] = useState(resume?.first_name ?? '')
+  const [lastName, setLastName] = useState(resume?.last_name ?? '')
+  const [major, setMajor] = useState(resume?.major ?? '')
   const [busy, setBusy] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -37,6 +41,12 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
       setErrorMessage('The PDF must be 500 KB or smaller.')
       return
     }
+    // Clean input before writing: trim the text fields, which the table requires to be non-blank.
+    const details = { first_name: firstName.trim(), last_name: lastName.trim(), major: major.trim() }
+    if (!details.first_name || !details.last_name || !details.major) {
+      setErrorMessage('First name, last name, and major are required.')
+      return
+    }
 
     // Every member has one file at a fixed path. upsert: true overwrites an existing
     // file there, so a replacement never leaves a gap with no resume.
@@ -51,7 +61,7 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
     }
 
     // Upload first, then save the details. The database sets uploaded_at on insert and update.
-    const fields = { object_path: path, original_filename: filename }
+    const fields = { ...details, object_path: path, original_filename: filename }
     const { error } = isNew
       ? await supabase.from('resume').insert({ ...fields, user_id: userId })
       : await supabase.from('resume').update(fields).eq('user_id', userId)
@@ -85,6 +95,19 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
         PDF file (500 KB max)
         <input type="file" accept="application/pdf" required
           onChange={(event) => setFile(event.target.files[0] ?? null)} />
+      </label>
+
+      <label>
+        First name
+        <input required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+      </label>
+      <label>
+        Last name
+        <input required value={lastName} onChange={(event) => setLastName(event.target.value)} />
+      </label>
+      <label>
+        Major
+        <input required value={major} onChange={(event) => setMajor(event.target.value)} />
       </label>
 
       {errorMessage && <p role="alert">{errorMessage}</p>}

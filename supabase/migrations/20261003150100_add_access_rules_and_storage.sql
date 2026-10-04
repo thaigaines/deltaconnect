@@ -90,9 +90,10 @@ REVOKE ALL ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,bool
 GRANT EXECUTE ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,boolean) TO authenticated;
 
 -- Resume listings are public, but only members may change their own metadata.
-GRANT SELECT (object_path, original_filename, uploaded_at) ON public.resume TO anon;
+GRANT SELECT (first_name, last_name, major, object_path, original_filename, uploaded_at) ON public.resume TO anon;
 GRANT SELECT ON public.resume TO authenticated;
-GRANT INSERT (user_id, object_path, original_filename), UPDATE (object_path, original_filename), DELETE
+GRANT INSERT (user_id, first_name, last_name, major, object_path, original_filename),
+  UPDATE (first_name, last_name, major, object_path, original_filename), DELETE
   ON public.resume TO authenticated;
 CREATE POLICY read_resumes ON public.resume FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY create_resume ON public.resume FOR INSERT TO authenticated

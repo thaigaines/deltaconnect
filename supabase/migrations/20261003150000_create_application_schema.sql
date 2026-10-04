@@ -31,6 +31,9 @@ CREATE TABLE private.approved_editor (
 );
 CREATE TABLE public.resume (
   user_id uuid PRIMARY KEY DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  first_name text NOT NULL CHECK (first_name = btrim(first_name) AND first_name ~ '[^[:space:]]'),
+  last_name text NOT NULL CHECK (last_name = btrim(last_name) AND last_name ~ '[^[:space:]]'),
+  major text NOT NULL CHECK (major = btrim(major) AND major ~ '[^[:space:]]'),
   object_path text NOT NULL UNIQUE CHECK (object_path = user_id::text || '/resume.pdf'),
   original_filename text NOT NULL CHECK (original_filename = btrim(original_filename) AND original_filename ~ '[^[:space:]]'),
   uploaded_at timestamptz NOT NULL DEFAULT now()

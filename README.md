@@ -38,7 +38,7 @@ Python may be added for supporting tasks such as data imports when needed.
 | --- | --- | --- |
 | `public.internship` | Listing content, optional deadline, archive status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
-| `public.resume` | At most one resume per user; unique object path, original filename, upload time | `user_id` → `auth.users.id`; cascading deletion |
+| `public.resume` | At most one resume per user; name, major, unique object path, original filename, upload time | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
 
@@ -101,6 +101,10 @@ not remove Storage files. Revoking membership does not unpublish existing resume
 `object_path`, even when `user_id` is unavailable.
 
 ## Set up the database
+
+Each migration is a SQL script that makes one change to the database schema. Run
+in filename order, they build the current schema step by step. Never edit a
+migration a database has already run; add a new one instead.
 
 On a fresh Supabase project, run each file in `supabase/migrations/` in filename
 order in the SQL Editor as administrator, or apply them with the Supabase CLI.

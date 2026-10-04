@@ -203,6 +203,8 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }
 .company { font-weight: 500; }
+/* Resume PDF preview at the top of each resume card. */
+.resume-preview { width: 100%; height: 24rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--bg); }
 .card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid rgba(255, 255, 255, 0.06); } /* margin-top: auto pins the footer to the card bottom */
 /* Apply link styled as a purple pill, matching the button shape. */
 .apply {
