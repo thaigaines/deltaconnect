@@ -1,38 +1,29 @@
-// Public resume directory: anyone can view it, no login needed.
-// Loads resume details and shows each PDF as a preview that opens the full file when clicked.
-// Signed-in members also get an Add/Edit resume button for their own resume.
+// Public resume directory (no login needed). Members can also add or edit their own resume.
 import { useEffect, useState } from 'react'
 import { supabase, resumeBucket, resumePath } from './supabase.js'
 import ResumeForm from './ResumeForm.jsx'
 
-// ============================================================
-// Component
-// userId: the signed-in user's id, or undefined when signed out.
-// isMember: true only for approved members, who may add or edit their own resume.
-// ============================================================
+// ---------- Component ----------
+// userId: signed-in user's id, or undefined. isMember: may add or edit their own resume.
 export default function Resumes({ userId, isMember }) {
   // ---------- State ----------
   const [resumes, setResumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
-  // A counter whose only job is to change; changing it reruns the load effect below.
+  // Bumping refresh reruns the load effect.
   const [refresh, setRefresh] = useState(0)
-  // Whether the add/edit form is open.
   const [formOpen, setFormOpen] = useState(false)
 
   // ---------- Load resumes ----------
-  // Runs when the page first appears and again whenever refresh changes.
   useEffect(() => {
-    // If a newer load starts or the page is left before this request finishes,
-    // the cleanup sets cancelled so the outdated response is ignored.
+    // Ignores an outdated response if a newer load starts or the page is left.
     let cancelled = false
 
     async function loadResumes() {
       setLoading(true)
       setErrorMessage('')
 
-      // Visitors who aren't logged in may read only these columns (not user_id).
-      // Newest uploads first; object_path breaks ties so the order is stable.
+      // Logged-out visitors may read only these columns. Newest first; object_path breaks ties.
       const { data, error } = await supabase
         .from('resume')
         .select('object_path,original_filename,uploaded_at,first_name,last_name,major')
@@ -50,12 +41,10 @@ export default function Resumes({ userId, isMember }) {
   }, [refresh])
 
   // ---------- Derived values ----------
-  // Every member's file has a fixed path, so the member's own row can be found
-  // in the list already loaded. undefined means they haven't uploaded one yet.
+  // The member's own row, found by its fixed path; undefined if they have none.
   const myResume = resumes.find((resume) => resume.object_path === resumePath(userId))
 
   // ---------- Event handlers ----------
-  // After a save: close the form and reload the list so the change shows.
   function handleSaved() {
     setFormOpen(false)
     setRefresh((value) => value + 1)
@@ -64,8 +53,8 @@ export default function Resumes({ userId, isMember }) {
   // ---------- Render ----------
   return (
     <section aria-labelledby="resumes-heading">
-      {/* ----- Heading, add/edit (members only), and refresh ----- */}
-      {/* The add/edit button waits for loading so it never says "Add" for a member who already has one. */}
+      {/* ----- Heading and actions ----- */}
+      {/* Disabled while loading, so it never says "Add" to a member who has a resume. */}
       <div className="section-head">
         <h2 id="resumes-heading">Public resumes</h2>
         <div className="actions">
@@ -79,16 +68,14 @@ export default function Resumes({ userId, isMember }) {
       </div>
       <p className="meta">Browse chapter resumes without logging in.</p>
 
-      {/* ----- Add/edit form: drops down here while open ----- */}
-      {/* ?? turns undefined (no resume yet) into null, which ResumeForm treats as "add". */}
+      {/* ----- Add/edit form (?? turns undefined into null, meaning "add") ----- */}
       {formOpen && (
         <div className="panel">
           <ResumeForm userId={userId} resume={myResume ?? null} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
         </div>
       )}
 
-      {/* ----- Results ----- */}
-      {/* The ternary chain picks one: loading message, error, empty message, or the list. */}
+      {/* ----- Results: loading, error, empty, or the cards ----- */}
       {loading ? (
         <p role="status">Loading resumes...</p>
       ) : errorMessage ? (
@@ -98,14 +85,13 @@ export default function Resumes({ userId, isMember }) {
       ) : (
         <ul className="results">
           {resumes.map((resume) => {
-            // getPublicUrl only builds the URL; it doesn't download or check the PDF.
+            // Builds the URL only; nothing is downloaded here.
             const { data } = supabase.storage.from(resumeBucket).getPublicUrl(resume.object_path)
             const name = `${resume.first_name} ${resume.last_name}`
             return (
               <li key={resume.object_path}>
-                {/* The browser's PDF viewer draws the preview; the #settings ask it to fit the page
-                    with no toolbar. The link sits on top of the preview, so a click anywhere opens the
-                    PDF in a new tab. The preview itself is skipped by Tab and screen readers. */}
+                {/* Browser PDF preview (#settings: fit page, no toolbar), skipped by Tab and screen readers.
+                    The link covers it, so a click anywhere opens the PDF in a new tab. */}
                 <div className="resume-preview">
                   <iframe src={`${data.publicUrl}#toolbar=0&navpanes=0&view=Fit`} title={`${name} resume preview`} tabIndex={-1} aria-hidden="true" />
                   <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${name}'s resume (PDF)`} />

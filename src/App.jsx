@@ -1,45 +1,38 @@
-// The top-level component: page layout, navigation, login, and access checks.
-// It decides which screen to show and hands the internships list to Listings.jsx
-// and the public resume directory to Resumes.jsx.
+// Top-level component: layout, navigation, login, and access checks.
+// Shows the public resume directory (Resumes.jsx) or the members-only internships (Listings.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Listings from './Listings.jsx'
 import Resumes from './Resumes.jsx'
 
 export default function App() {
-  // ============================================================
-  // State
-  // useState returns [current value, setter]. Calling a setter re-renders the component.
-  // ============================================================
+  // ---------- State ----------
+  // useState returns [value, setter]; calling the setter re-renders the component.
 
-  // Navigation: the part of the URL after '#', e.g. '#/resumes'.
+  // The URL part after '#', e.g. '#/resumes'.
   const [page, setPage] = useState(window.location.hash)
 
-  // Login form: controlled inputs, plus a busy flag that disables buttons during requests.
+  // Login form. busy disables buttons while a request runs.
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // Login session: null when signed out. loadingSession is true until Supabase reports
-  // whether a saved session exists, so the login form doesn't flash for signed-in users.
+  // session is null when signed out. loadingSession stops the login form flashing on reload.
   const [session, setSession] = useState(null)
   const [loadingSession, setLoadingSession] = useState(true)
 
-  // Access: { is_member, is_editor } from the database, or null while checking.
-  // accessCheck is a counter; changing it reruns the permissions check below.
+  // permissions is { is_member, is_editor }, or null while checking.
+  // Bumping accessCheck reruns the permissions check.
   const [permissions, setPermissions] = useState(null)
   const [permissionsError, setPermissionsError] = useState('')
   const [accessCheck, setAccessCheck] = useState(0)
 
-  // ============================================================
-  // Effects: connect React to things outside it (the URL, Supabase).
-  // useEffect(fn, deps) runs fn after rendering, and again when a value in deps changes.
-  // An empty deps list [] means "run once when the component first appears".
-  // A returned function is "cleanup": React calls it before rerunning or removing the effect.
-  // ============================================================
+  // ---------- Effects ----------
+  // useEffect(fn, deps) runs fn after render and again when a deps value changes ([] = once).
+  // The function it returns is cleanup, run before the next run or when the component leaves.
 
-  // Navigation: when the URL hash changes (a nav link was clicked), store the new page.
+  // Track the page when a nav link changes the URL hash.
   useEffect(() => {
     function changePage() {
       setPage(window.location.hash)
@@ -48,8 +41,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', changePage)
   }, [])
 
-  // Session: Supabase calls this on page load (with any saved session), on log in and
-  // log out, and also when the tab regains focus (it re-checks the same session then).
+  // Supabase reports the session on load, login, logout, and when the tab regains focus.
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
@@ -58,27 +50,21 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [])
 
-  // The signed-in user's id, or undefined when signed out. Effects below depend on this
-  // instead of the whole session, so re-checking the same user (e.g. returning to the tab)
-  // doesn't reset access or reload the page's content.
+  // Effects depend on the id, not the session, so re-checking the same user changes nothing.
   const userId = session?.user.id
-
-  // Whether the public resume directory is showing; everything else is the internships page.
   const isResumesPage = page === '#/resumes'
 
-  // Permissions: when the user changes or accessCheck is bumped by refreshAccess, clear the
-  // old result (so one account never sees another's access), then ask the database whether
-  // this account is a member/editor.
+  // Check member/editor access whenever the user changes or access is refreshed.
+  // Clearing first means one account never sees another's access.
   useEffect(() => {
     setPermissions(null)
     setPermissionsError('')
     if (!userId) return
-    // cancelled lets a slow, outdated response be ignored (e.g. the user signed out meanwhile).
-    // It doesn't stop the network request; it only stops us from using the result.
+    // Ignores a slow, outdated response (e.g. the user signed out meanwhile).
     let cancelled = false
 
     async function loadPermissions() {
-      // my_permissions() is a database function; .single() returns one row instead of a list.
+      // .single() returns one row instead of a list.
       const { data, error } = await supabase.rpc('my_permissions').single()
       if (cancelled) return
       if (error) setPermissionsError(error.message)
@@ -89,18 +75,12 @@ export default function App() {
     return () => { cancelled = true }
   }, [userId, accessCheck])
 
-  // ============================================================
-  // Event handlers: run in response to clicks and form submits.
-  // ============================================================
-
-  // "Retry" / "Refresh access" buttons: bumping the counter reruns the permissions effect.
+  // ---------- Event handlers ----------
   function refreshAccess() {
     setAccessCheck((value) => value + 1)
   }
 
-  // Login form submit. preventDefault stops the browser's default full-page reload.
-  // await pauses this function until Supabase answers; the session listener above
-  // then receives the new session automatically. The password is cleared once it's no longer needed.
+  // preventDefault stops the page reload; the session listener picks up the new session.
   async function handleLogin(event) {
     event.preventDefault()
     setErrorMessage('')
@@ -111,7 +91,7 @@ export default function App() {
     else setPassword('')
   }
 
-  // Sign out on this device only; sessions on the user's other devices stay signed in.
+  // Signs out this device only.
   async function handleSignOut() {
     setErrorMessage('')
     setBusy(true)
@@ -120,25 +100,22 @@ export default function App() {
     if (error) setErrorMessage(error.message)
   }
 
-  // ============================================================
-  // Render
-  // JSX looks like HTML; anything inside { } is a JavaScript expression.
-  // <>...</> is a fragment: it groups elements without adding an extra element to the page.
-  // ============================================================
+  // ---------- Render ----------
+  // In JSX, { } holds JavaScript. <>...</> groups elements without adding one to the page.
   return (
     <>
-      {/* ----- Top bar: name and navigation on the left, account on the right ----- */}
+      {/* ----- Top bar ----- */}
       <header className="topbar">
         <div className="container topbar-inner">
           <div className="brand-nav">
             <a className="brand" href="#/internships">DeltaConnect</a>
-            {/* aria-current marks the active link for screen readers and for the CSS highlight. */}
+            {/* aria-current marks the active link for screen readers and the CSS highlight. */}
             <nav aria-label="Main navigation">
               <a href="#/internships" aria-current={!isResumesPage ? 'page' : undefined}>Internships</a>
               <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
             </nav>
           </div>
-          {/* a && b renders b only when a is truthy: the account area appears only while signed in. */}
+          {/* a && b shows b only when a is truthy. */}
           {session && (
             <div className="account">
               <span>{session.user.email}</span>
@@ -148,7 +125,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* ----- Hero: site name and a tagline that depends on the page ----- */}
+      {/* ----- Hero ----- */}
       <section className="hero">
         <div className="container">
           <h1>DeltaConnect</h1>
@@ -158,21 +135,14 @@ export default function App() {
         </div>
       </section>
 
-      {/* ----- Main content: exactly one screen is chosen below ----- */}
+      {/* ----- Main content: the first matching screen wins ----- */}
       <main className="container">
-        {/* The ternary chain is checked top to bottom:
-            1. Resumes page -> public directory (no login needed; members can also add/edit)
-            2. Still checking for a saved session -> "Checking login..."
-            3. Signed in -> access checks, then Listings
-            4. Otherwise -> login form */}
         {isResumesPage ? (
-          // key resets the page (closing any open form) when a different account signs in.
+          // A new key (different account) resets the page and closes any open form.
           <Resumes key={userId} userId={userId} isMember={permissions?.is_member === true} />
         ) : loadingSession ? (
           <p role="status">Checking login...</p>
         ) : session ? (
-          // Signed in: show an access error, a "checking" message, the listings for members,
-          // or an access-denied message for accounts that aren't approved members.
           permissionsError ? (
             <div>
               <p role="alert">Could not check access: {permissionsError}</p>
@@ -181,8 +151,7 @@ export default function App() {
           ) : !permissions ? (
             <p role="status">Checking access...</p>
           ) : permissions.is_member ? (
-            // key changes when the account or access check changes, which makes React
-            // replace Listings with a fresh copy (empty state, new data load).
+            // A new key replaces Listings with a fresh copy that reloads its data.
             <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
           ) : (
             <div>
@@ -191,7 +160,6 @@ export default function App() {
             </div>
           )
         ) : (
-          // Signed out: login form. Each input is controlled by its state value.
           <section className="login-card" aria-labelledby="login-heading">
             <h2 id="login-heading">Member login</h2>
             <p>Chapter access is by invitation. Contact the owner for an account.</p>
@@ -211,7 +179,7 @@ export default function App() {
           </section>
         )}
 
-        {/* Login and sign-out errors. Sign out is available on both pages, so this shows on both. */}
+        {/* Login and sign-out errors. */}
         {errorMessage && <p role="alert">{errorMessage}</p>}
       </main>
     </>

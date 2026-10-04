@@ -1,17 +1,11 @@
-// Add/edit form for editors, shown inline: above the list when adding, inside the card when editing.
-// With no listing prop it adds a new listing; with a listing it edits that one.
-// The database's access rules (RLS) still decide whether the save is allowed.
+// Editor form to add a listing (no listing prop) or edit one. RLS still decides if a save is allowed.
 import { useState } from 'react'
 import { supabase } from './supabase.js'
 
-// ============================================================
-// Helpers: plain JavaScript functions, no React involved.
-// ============================================================
+// ---------- Helpers ----------
 
-// Turns the locations text into rows for the database.
 // 'Boston, ma; New York, NY' -> [{ city: 'Boston', state: 'MA' }, { city: 'New York', state: 'NY' }]
-// Empty entries (e.g. a trailing ';') are skipped. A missing city or state becomes '',
-// which handleSubmit catches before saving.
+// Blank entries are skipped; a missing city or state becomes '' for handleSubmit to reject.
 function parseLocations(text) {
   return text.split(';')
     .map((entry) => entry.trim())
@@ -22,8 +16,7 @@ function parseLocations(text) {
     })
 }
 
-// Calls the create_listing() database function, which saves the listing and its
-// locations together: if any part fails, nothing is saved. Returns the error, or null.
+// Saves a listing and its locations together (all or nothing). Returns the error, or null.
 async function createListing(fields, locations, allowDuplicate) {
   const { error } = await supabase.rpc('create_listing', {
     p_title: fields.title,
@@ -37,18 +30,14 @@ async function createListing(fields, locations, allowDuplicate) {
   return error
 }
 
-// ============================================================
-// Component
-// listing: the listing to edit, or null to add a new one.
-// onClose: called when the editor clicks Cancel.
-// onSaved: called after a successful save so the list can reload.
-// ============================================================
+// ---------- Component ----------
+// listing: the listing to edit, or null to add one.
+// onClose: Cancel clicked. onSaved: saved, so the list can reload.
 export default function ListingForm({ listing, onClose, onSaved }) {
   const isNew = !listing
 
   // ---------- State ----------
-  // Starting values: the listing's current values when editing, blanks when adding.
-  // ?. returns undefined instead of crashing when listing is null; ?? then supplies the blank.
+  // Start from the listing's values, or blanks when adding (?. and ?? handle a null listing).
   const [title, setTitle] = useState(listing?.title ?? '')
   const [company, setCompany] = useState(listing?.company ?? '')
   const [url, setUrl] = useState(listing?.application_url ?? '')
@@ -64,7 +53,7 @@ export default function ListingForm({ listing, onClose, onSaved }) {
     event.preventDefault()
     setErrorMessage('')
 
-    // Clean input before writing: trim text and turn a blank deadline into null (no deadline).
+    // Clean input: trim text; a blank deadline becomes null.
     const fields = {
       title: title.trim(),
       company: company.trim(),
@@ -76,7 +65,6 @@ export default function ListingForm({ listing, onClose, onSaved }) {
       setErrorMessage('Title and company are required.')
       return
     }
-    // Adding only: turn the locations text into rows, and stop if any entry is incomplete.
     const parsed = isNew ? parseLocations(locations) : []
     if (parsed.some((location) => !location.city || !location.state)) {
       setErrorMessage('Write each location as City, ST and separate them with semicolons.')
@@ -86,14 +74,12 @@ export default function ListingForm({ listing, onClose, onSaved }) {
     let error
     setBusy(true)
     if (isNew) {
-      // 23505 is the database's "duplicate" error code. Ask the editor, then retry
-      // with the duplicate override if they confirm.
+      // 23505 means duplicate URL: ask, then retry with the override.
       error = await createListing(fields, parsed, false)
       if (error?.code === '23505' && window.confirm('A listing with this application URL already exists. Add it anyway?')) {
         error = await createListing(fields, parsed, true)
       }
     } else {
-      // Editing changes only this listing's own row, so one update saves everything at once.
       const result = await supabase
         .from('internship')
         .update({ ...fields, is_archived: isArchived })
@@ -107,11 +93,9 @@ export default function ListingForm({ listing, onClose, onSaved }) {
   }
 
   // ---------- Render ----------
-  // aria-label names the form for screen readers; the parent decides where it appears.
   return (
     <form className="listing-form" onSubmit={handleSubmit} aria-label={isNew ? 'Add listing' : 'Edit listing'}>
       <h3>{isNew ? 'Add listing' : 'Edit listing'}</h3>
-      {/* ----- Fields shared by add and edit ----- */}
       <label>
         Title
         <input required value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -137,7 +121,7 @@ export default function ListingForm({ listing, onClose, onSaved }) {
         <input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} />
       </label>
 
-      {/* ----- Add only: locations are saved together with a new listing ----- */}
+      {/* Locations are saved with a new listing only. */}
       {isNew && (
         <label>
           Locations (City, ST; City, ST), or blank if none
@@ -145,7 +129,7 @@ export default function ListingForm({ listing, onClose, onSaved }) {
         </label>
       )}
 
-      {/* ----- Edit only: archiving hides the listing from members ("remove") ----- */}
+      {/* Archiving hides a listing from members. */}
       {!isNew && (
         <label className="checkbox">
           <input type="checkbox" checked={isArchived} onChange={(event) => setIsArchived(event.target.checked)} />
@@ -155,7 +139,6 @@ export default function ListingForm({ listing, onClose, onSaved }) {
 
       {errorMessage && <p role="alert">{errorMessage}</p>}
 
-      {/* ----- Actions ----- */}
       <div className="form-actions">
         <button type="button" onClick={onClose}>Cancel</button>
         <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save'}</button>

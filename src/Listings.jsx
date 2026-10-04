@@ -1,18 +1,13 @@
-// Internships page (members only).
-// Loads the listings this account may see, then lets the member search and filter them.
-// Supabase's row-level security (RLS) decides which rows come back: members get active
-// listings, editors get everything, including archived and expired ones.
+// Internships page (members only): loads listings, then search and filters.
+// RLS decides which rows come back: members get active listings, editors get all of them.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import ListingForm from './ListingForm.jsx'
 
-// ============================================================
-// Helpers: plain JavaScript functions, no React involved.
-// They sit outside the component so they aren't recreated on every render.
-// ============================================================
+// ---------- Helpers ----------
+// Plain functions outside the component, so they aren't recreated on every render.
 
-// Work arrangement filter options. value matches the database; label is what the button shows.
-// An empty value means "no filter".
+// Work arrangement buttons. value matches the database; '' means no filter.
 const arrangementOptions = [
   { value: '', label: 'All' },
   { value: 'in-person', label: 'In-person' },
@@ -20,90 +15,75 @@ const arrangementOptions = [
   { value: 'remote', label: 'Remote' },
 ]
 
-// Turns a listing's location rows into labels, e.g. [{ city: 'Boston', state: 'MA' }] -> ['Boston, MA'].
-// A listing can have zero, one, or many locations.
+// [{ city: 'Boston', state: 'MA' }] -> ['Boston, MA']. A listing may have no locations.
 function locationLabels(listing) {
   return listing.internship_location.map(({ city, state }) => `${city}, ${state}`)
 }
 
-// Today's date in Eastern time as 'YYYY-MM-DD', the same format as listing.deadline.
-// The database decides "expired" using Eastern time, so the page does too,
-// no matter which timezone the visitor's computer is set to.
+// Today in Eastern time as 'YYYY-MM-DD', matching how the database decides "expired".
 function easternToday() {
-  // formatToParts splits a formatted date into pieces: [{ type: 'month', value: '10' }, ...]
+  // formatToParts splits the date into pieces: [{ type: 'month', value: '10' }, ...]
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(new Date())
-  // Small helper: find the piece with the given type and return its value.
   const part = (type) => parts.find((value) => value.type === type).value
   return `${part('year')}-${part('month')}-${part('day')}`
 }
 
-// Number of days from today until the deadline; both are 'YYYY-MM-DD' strings.
-// Today -> 0, tomorrow -> 1, already passed -> negative (only editors see those listings).
-// Callers must check that a deadline exists first.
+// Days from today to a deadline ('YYYY-MM-DD'): today 0, tomorrow 1, passed negative.
 function daysLeft(deadline, today) {
-  // Both dates become midnight UTC. Using UTC for both means daylight-saving changes
-  // can't make a "day" 23 or 25 hours long, so the division below is always a whole number.
+  // UTC midnights avoid daylight-saving days of 23 or 25 hours.
   const end = new Date(`${deadline}T00:00:00Z`)
   const start = new Date(`${today}T00:00:00Z`)
-  // Subtracting two Dates gives milliseconds; divide by the milliseconds in one day.
+  // Subtracting Dates gives milliseconds.
   const msPerDay = 1000 * 60 * 60 * 24
   return Math.round((end - start) / msPerDay)
 }
 
-// Chip text for a listing that closes soon, e.g. 0 -> 'Closes today', 3 -> '3 days left'.
+// 0 -> 'Closes today', 3 -> '3 days left'.
 function urgencyLabel(days) {
   if (days === 0) return 'Closes today'
   if (days === 1) return '1 day left'
   return `${days} days left`
 }
 
-// Formats a deadline for display, e.g. '2026-10-24' -> 'Oct 24, 2026'.
+// '2026-10-24' -> 'Oct 24, 2026'.
 function deadlineLabel(deadline) {
   if (!deadline) return 'No deadline provided'
-  // timeZone 'UTC' matches the UTC midnight below, so the date can't shift back a day.
+  // Formatting in UTC keeps the date from shifting back a day.
   return new Intl.DateTimeFormat('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
   }).format(new Date(`${deadline}T00:00:00Z`))
 }
 
-// ============================================================
-// Component
-// isEditor is a prop passed in from App.jsx. Editors see extra status chips.
-// ============================================================
+// ---------- Component ----------
+// isEditor: editors can add and edit listings and see status chips.
 export default function Listings({ isEditor }) {
   // ---------- State ----------
-  // Data from Supabase and the request status.
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
-  // A counter whose only job is to change; changing it reruns the load effect below.
+  // Bumping refresh reruns the load effect.
   const [refresh, setRefresh] = useState(0)
 
-  // Filter controls. These are "controlled inputs": the input shows the state value,
-  // and typing updates the state. An empty string means "no filter".
+  // Filters ('' = no filter). Controlled inputs: each shows its state and updates it on change.
   const [search, setSearch] = useState('')
   const [location, setLocation] = useState('')
   const [arrangement, setArrangement] = useState('')
 
-  // Editor form: null when closed, { listing: null } when adding,
-  // { listing } when editing that listing.
+  // Editor form: null = closed, { listing: null } = adding, { listing } = editing it.
   const [form, setForm] = useState(null)
 
   // ---------- Load listings ----------
-  // Runs when the page first appears and again whenever refresh changes.
   useEffect(() => {
-    // If this effect is replaced (refresh clicked again, or the page is left) before the
-    // request finishes, the cleanup sets cancelled so the old response is ignored.
+    // Ignores an outdated response if refresh is clicked again or the page is left.
     let cancelled = false
 
     async function loadListings() {
       setLoading(true)
       setErrorMessage('')
 
-      // Ask for listings plus their locations in one request. Ordering: nearest deadline
-      // first, listings with no deadline last, and id as a tie-breaker so order is stable.
+      // Listings with their locations; nearest deadline first, undated last, id breaks ties.
       const { data, error } = await supabase
         .from('internship')
         .select('id,title,company,application_url,work_arrangement,deadline,is_archived,internship_location(city,state)')
@@ -121,13 +101,12 @@ export default function Listings({ isEditor }) {
   }, [refresh])
 
   // ---------- Derived values ----------
-  // These are recalculated on every render from state; they don't need their own useState.
+  // Recalculated from state on every render, so they don't need useState.
 
-  // Location dropdown options: every label from every listing, duplicates removed (Set), sorted.
+  // Every location label, without duplicates (Set), sorted.
   const locations = [...new Set(listings.flatMap(locationLabels))].sort()
 
-  // Listings that pass all three filters. Search matches title, company, or any location,
-  // ignoring case. An empty filter (!location, !arrangement) lets every listing through.
+  // Search matches title, company, or a location, ignoring case.
   const query = search.trim().toLowerCase()
   const visible = listings.filter((listing) => {
     const labels = locationLabels(listing)
@@ -136,11 +115,10 @@ export default function Listings({ isEditor }) {
       && (!arrangement || listing.work_arrangement === arrangement)
   })
 
-  // Today's Eastern date, worked out once so every card compares against the same day.
+  // Worked out once so every card uses the same day.
   const today = easternToday()
 
   // ---------- Event handlers ----------
-  // After a save: close the form and reload the list so the change shows.
   function handleSaved() {
     setForm(null)
     setRefresh((value) => value + 1)
@@ -149,7 +127,7 @@ export default function Listings({ isEditor }) {
   // ---------- Render ----------
   return (
     <section aria-labelledby="internships-heading">
-      {/* ----- Heading, add (editors only), and refresh ----- */}
+      {/* ----- Heading and actions ----- */}
       <div className="section-head">
         <h2 id="internships-heading">Internships</h2>
         <div className="actions">
@@ -160,7 +138,7 @@ export default function Listings({ isEditor }) {
         </div>
       </div>
 
-      {/* ----- Add form: drops down here while adding (form.listing is null) ----- */}
+      {/* ----- Add form ----- */}
       {form && !form.listing && (
         <div className="panel">
           <ListingForm listing={null} onClose={() => setForm(null)} onSaved={handleSaved} />
@@ -168,7 +146,6 @@ export default function Listings({ isEditor }) {
       )}
 
       {/* ----- Filters ----- */}
-      {/* Each control reads its state value and writes changes back with its setter. */}
       <div className="filters">
         <label>
           Search
@@ -181,9 +158,7 @@ export default function Listings({ isEditor }) {
             {locations.map((label) => <option key={label} value={label}>{label}</option>)}
           </select>
         </label>
-        {/* Button group: one button per option. Clicking a button stores its value in
-            arrangement state; aria-pressed marks the selected button for screen readers
-            and for the CSS highlight. */}
+        {/* aria-pressed marks the selected button for screen readers and the CSS highlight. */}
         <div className="filter-group">
           <span id="arrangement-label">Work arrangement</span>
           <div className="button-group" role="group" aria-labelledby="arrangement-label">
@@ -197,9 +172,7 @@ export default function Listings({ isEditor }) {
         </div>
       </div>
 
-      {/* ----- Results ----- */}
-      {/* A chain of ternaries (a ? b : c ? d : e) picks exactly one thing to show:
-          loading message, error, empty message, or the list of cards. */}
+      {/* ----- Results: loading, error, empty, or the cards ----- */}
       {loading ? <p role="status">Loading internships...</p> : errorMessage ? (
         <p role="alert">Could not load internships: {errorMessage}</p>
       ) : visible.length === 0 ? (
@@ -207,13 +180,11 @@ export default function Listings({ isEditor }) {
       ) : (
         <ul className="results">
           {visible.map((listing) => {
-            // Only call daysLeft when there is a deadline; then a listing is urgent
-            // if it closes today or within the next 7 days.
+            // Urgent: closes within the next 7 days.
             const days = listing.deadline ? daysLeft(listing.deadline, today) : null
             const urgent = days !== null && days >= 0 && days <= 7
 
-            // While this listing is being edited, its card shows the edit form instead.
-            // key lets React match each card to its listing between renders.
+            // The card being edited shows the form instead. key matches cards to listings.
             if (form?.listing?.id === listing.id) {
               return (
                 <li key={listing.id}>
@@ -223,7 +194,6 @@ export default function Listings({ isEditor }) {
             }
             return (
               <li key={listing.id}>
-                {/* Card top: company and deadline chip (purple countdown when urgent). */}
                 <div className="card-top">
                   <span className="company">{listing.company}</span>
                   <span className={urgent ? 'chip urgent' : 'chip'}>
@@ -231,19 +201,15 @@ export default function Listings({ isEditor }) {
                   </span>
                 </div>
 
-                {/* Card body: title, then locations and work arrangement. */}
                 <h3>{listing.title}</h3>
                 <p className="meta">
                   {locationLabels(listing).join(' · ') || 'No city/state provided'} · {listing.work_arrangement}
                 </p>
 
-                {/* Card footer: editor-only status chips, the application link, and
-                    an Edit button for editors. a && b renders b only when a is true. */}
                 <div className="card-footer">
                   <div className="chips">
                     {isEditor && listing.is_archived && <span className="chip">Archived</span>}
-                    {/* Expired: deadline already passed (days < 0). With no deadline days is null,
-                        and null < 0 is false, so no chip. */}
+                    {/* null < 0 is false, so undated listings never show Expired. */}
                     {isEditor && days < 0 && <span className="chip">Expired</span>}
                   </div>
                   {/* noopener noreferrer stops the new tab from controlling this page. */}

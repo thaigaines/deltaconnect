@@ -1,26 +1,17 @@
-// Add/edit resume form for members, shown in a panel above the resume directory.
-// With no resume prop it adds the member's first resume; with a resume it edits the details
-// and, if a new PDF is chosen, replaces the file.
-// The database and Storage access rules (RLS) still decide whether each write is allowed.
+// Member form to add a resume (no resume prop) or edit one; a new PDF is optional when editing.
+// RLS still decides if each write is allowed.
 import { useState } from 'react'
 import { supabase, resumeBucket, resumePath } from './supabase.js'
 
-// ============================================================
-// Component
-// userId: the signed-in member's id; their file always lives at resumePath(userId).
-// resume: the member's current resume row, or null if they haven't uploaded one.
-// onClose: called when the member clicks Cancel.
-// onSaved: called after a successful save so the directory can reload.
-// ============================================================
+// ---------- Component ----------
+// userId: the member's id. resume: their current row, or null.
+// onClose: Cancel clicked. onSaved: saved, so the directory can reload.
 export default function ResumeForm({ userId, resume, onClose, onSaved }) {
   const isNew = !resume
 
   // ---------- State ----------
-  // file: the File object the member picked, or null before they pick one.
-  // A file input can't be "controlled" like a text input (browsers don't let code set
-  // its value), so we only read from it in onChange.
+  // The picked File, or null. Browsers don't let code set a file input, so it's read in onChange only.
   const [file, setFile] = useState(null)
-  // Text fields start from the current resume when editing, or empty when adding.
   const [firstName, setFirstName] = useState(resume?.first_name ?? '')
   const [lastName, setLastName] = useState(resume?.last_name ?? '')
   const [major, setMajor] = useState(resume?.major ?? '')
@@ -32,8 +23,7 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
     event.preventDefault()
     setErrorMessage('')
 
-    // Validate before writing; these match the bucket's limits and the table's filename rule.
-    // A file is required when adding. When editing, no file means "keep the current one".
+    // Matches the bucket's limits. No file while editing keeps the current one.
     const filename = file?.name.trim()
     if (isNew && !file) {
       setErrorMessage('Choose a PDF file.')
@@ -43,7 +33,6 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
       setErrorMessage('Choose a PDF file of 500 KB or smaller.')
       return
     }
-    // Clean input before writing: trim the text fields, which the table requires to be non-blank.
     const details = { first_name: firstName.trim(), last_name: lastName.trim(), major: major.trim() }
     if (!details.first_name || !details.last_name || !details.major) {
       setErrorMessage('First name, last name, and major are required.')
@@ -52,19 +41,17 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
 
     const path = resumePath(userId)
     const storage = supabase.storage.from(resumeBucket)
-    // error holds the first failure; each step below runs only if nothing has failed yet.
+    // Holds the first failure; later steps run only while it's null.
     let error = null
     setBusy(true)
 
-    // Upload first (only if a file was chosen). upsert: true overwrites the member's existing
-    // file at the same path, so a replacement never leaves a gap with no resume.
+    // Upload first. upsert overwrites the old file in place, so there's never a gap.
     if (file) {
       const upload = await storage.upload(path, file, { upsert: true, contentType: 'application/pdf' })
       error = upload.error
     }
 
-    // Then save the details; a new file also records its filename.
-    // The database sets uploaded_at on every insert and update.
+    // Then save the details (the database stamps uploaded_at).
     if (!error) {
       const fields = file ? { ...details, object_path: path, original_filename: filename } : details
       const result = isNew
@@ -72,8 +59,7 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
         : await supabase.from('resume').update(fields).eq('user_id', userId)
       error = result.error
 
-      // A failed first save would leave a file with no directory entry, so remove it.
-      // Skip this for 23505 (row already exists, e.g. added in another tab): that file is live.
+      // Remove the file if a first save failed, unless the row already exists (23505).
       if (error && isNew && error.code !== '23505') {
         const cleanup = await storage.remove([path])
         if (cleanup.error) error = { message: `${error.message} The uploaded file could not be removed; please try again.` }
@@ -90,10 +76,9 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
     <form className="resume-form" onSubmit={handleSubmit} aria-label={isNew ? 'Add resume' : 'Edit resume'}>
       <h3>{isNew ? 'Add resume' : 'Edit resume'}</h3>
 
-      {/* ----- Edit only: show which file is currently published ----- */}
       {!isNew && <p className="meta">Current file: {resume.original_filename}</p>}
 
-      {/* accept filters the file picker to PDFs; it's a convenience, not validation. */}
+      {/* accept only filters the file picker; handleSubmit does the real check. */}
       <label>
         {isNew ? 'PDF file (500 KB max)' : 'Replace PDF (optional, 500 KB max)'}
         <input type="file" accept="application/pdf" required={isNew}
@@ -115,7 +100,6 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
 
       {errorMessage && <p role="alert">{errorMessage}</p>}
 
-      {/* ----- Actions ----- */}
       <div className="form-actions">
         <button type="button" onClick={onClose}>Cancel</button>
         <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save'}</button>
