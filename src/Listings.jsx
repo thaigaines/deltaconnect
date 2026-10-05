@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import ListingForm from './ListingForm.jsx'
+import { loadRows } from './loadRows.js'
 
 // ---------- Helpers ----------
 // Plain functions outside the component, so they aren't recreated on every render.
@@ -84,11 +85,11 @@ export default function Listings({ isEditor }) {
       setErrorMessage('')
 
       // Listings with their locations; nearest deadline first, undated last, id breaks ties.
-      const { data, error } = await supabase
+      const { data, error } = await loadRows((options) => supabase
         .from('internship')
-        .select('id,title,company,application_url,work_arrangement,deadline,is_archived,internship_location(city,state)')
+        .select('id,title,company,application_url,work_arrangement,deadline,is_archived,internship_location(city,state)', options)
         .order('deadline', { ascending: true, nullsFirst: false })
-        .order('id', { ascending: true })
+        .order('id', { ascending: true }), 'id', () => cancelled)
 
       if (cancelled) return
       if (error) setErrorMessage(error.message)

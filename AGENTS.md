@@ -4,7 +4,7 @@
 
 - The user writes application logic for practice. Focus agent edits on tedious tasks, formatting, and small explicitly requested changes; provide advice instead of substantial implementations unless requested.
 - Evaluate proposals independently. Explain tradeoffs and use primary-source research when evidence could change a decision. Respect the user's informed final choice.
-- Keep code minimal and readable for student maintainers. Add dependencies or abstractions only for concrete requirements.
+- Prioritize readable, correct code for student maintainers, then measured performance. Add dependencies or abstractions only for concrete requirements.
 - With each incremental step, re-judge earlier steps in light of the new context and content. Remove redundancies, refactor, and compress where the new step makes that possible; this cleanup is part of the step.
 - Preserve user changes and scope. Get confirmation before pushing, deploying, publishing, deleting material files, or changing shared systems.
 - Prefer manual or temporary checks. Add permanent tests only when requested or agreed. Report changes, verification, and limitations.
@@ -30,5 +30,7 @@ The SQL setup does not automatically connect the frontend. Use user-scoped acces
 ## Verification
 
 Check affected validation, presentation, permissions, and failure cases against `README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
+
+When changing data loading, verify completeness against API limits and preserve search and filter behavior.
 
 Keep setup documentation concise. Use the name DeltaConnect in text; the top bar and browser tab show the Δ mark.

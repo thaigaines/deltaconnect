@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, resumeBucket } from './supabase.js'
 import ResumeForm from './ResumeForm.jsx'
+import { loadRows } from './loadRows.js'
 
 // ---------- Component ----------
 // userId: signed-in user's id, or undefined. isMember: may add or edit their own resume.
@@ -24,11 +25,11 @@ export default function Resumes({ userId, isMember }) {
       setErrorMessage('')
 
       // Logged-out visitors may read only these columns. Newest first; object_path breaks ties.
-      const { data, error } = await supabase
+      const { data, error } = await loadRows((options) => supabase
         .from('resume')
-        .select('object_path,original_filename,uploaded_at,first_name,last_name,major')
+        .select('object_path,original_filename,uploaded_at,first_name,last_name,major', options)
         .order('uploaded_at', { ascending: false })
-        .order('object_path')
+        .order('object_path'), 'object_path', () => cancelled)
 
       if (cancelled) return
       if (error) setErrorMessage(error.message)
@@ -57,19 +58,19 @@ export default function Resumes({ userId, isMember }) {
       <div className="section-head">
         <h2 id="resumes-heading">Public resumes</h2>
         <div className="actions">
-          {/* Disabled while loading, so it never says "Add" to a member who has a resume. */}
+          {/* Only complete results can determine whether the member already has a resume. */}
           {isMember && (
-            <button type="button" disabled={loading} onClick={() => setFormOpen(true)}>
+            <button type="button" disabled={loading || Boolean(errorMessage)} onClick={() => setFormOpen(true)}>
               {myResume ? 'Edit resume' : 'Add resume'}
             </button>
           )}
-          <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
+          <button type="button" disabled={loading || formOpen} onClick={() => setRefresh((value) => value + 1)}>Refresh resumes</button>
         </div>
       </div>
-      <p className="meta">Browse chapter resumes without logging in.</p>
+      <p className="meta">Browse chapter resumes.</p>
 
       {/* ----- Add/edit form (?? turns undefined into null, meaning "add") ----- */}
-      {formOpen && (
+      {formOpen && !loading && !errorMessage && (
         <div className="panel">
           <ResumeForm userId={userId} resume={myResume ?? null} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
         </div>
@@ -93,7 +94,7 @@ export default function Resumes({ userId, isMember }) {
                 {/* Browser PDF preview (#settings: fit page, no toolbar), skipped by Tab and screen readers.
                     The link covers it, so a click anywhere opens the PDF in a new tab. */}
                 <div className="resume-preview">
-                  <iframe src={`${data.publicUrl}#toolbar=0&navpanes=0&view=Fit`} title={`${name} resume preview`} tabIndex={-1} aria-hidden="true" />
+                  <iframe loading="lazy" src={`${data.publicUrl}#toolbar=0&navpanes=0&view=Fit`} title={`${name} resume preview`} tabIndex={-1} aria-hidden="true" />
                   <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${name}'s resume (PDF)`} />
                 </div>
                 <h3>{name}</h3>
