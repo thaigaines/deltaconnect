@@ -1,4 +1,4 @@
--- Enforces member/editor access and ownership rules for public resume storage.
+-- Enforces member/editor access and ownership rules for profiles and public resume storage.
 CREATE FUNCTION private.is_approved_member()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_member WHERE user_id = auth.uid()); $$;
@@ -18,8 +18,10 @@ REVOKE ALL ON FUNCTION public.my_permissions() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.my_permissions() TO authenticated;
 
 -- Editors see every listing. Regular members see only active listings.
+-- Editors may insert and update content columns; created_by and created_at come from their defaults.
 GRANT SELECT ON public.internship, public.internship_location TO authenticated;
-GRANT UPDATE (title, company, application_url, work_arrangement, deadline, is_archived)
+GRANT INSERT (title, company, application_url, work_arrangement, deadline),
+  UPDATE (title, company, application_url, work_arrangement, deadline, is_archived)
   ON public.internship TO authenticated;
 CREATE POLICY read_internships ON public.internship FOR SELECT TO authenticated USING (
   (SELECT private.is_approved_editor()) OR (
@@ -27,6 +29,8 @@ CREATE POLICY read_internships ON public.internship FOR SELECT TO authenticated 
     AND (deadline IS NULL OR deadline >= (now() AT TIME ZONE 'America/New_York')::date)
   )
 );
+CREATE POLICY create_internships ON public.internship FOR INSERT TO authenticated
+  WITH CHECK ((SELECT private.is_approved_editor()));
 CREATE POLICY edit_internships ON public.internship FOR UPDATE TO authenticated
   USING ((SELECT private.is_approved_editor())) WITH CHECK ((SELECT private.is_approved_editor()));
 GRANT INSERT (internship_id, city, state), UPDATE (city, state), DELETE
@@ -44,12 +48,13 @@ CREATE POLICY edit_locations ON public.internship_location FOR UPDATE TO authent
 CREATE POLICY delete_locations ON public.internship_location FOR DELETE TO authenticated
   USING ((SELECT private.is_approved_editor()));
 
--- This RPC is the only client creation path, so listing and locations are atomic.
+-- The app's creation path, so a listing and its locations save atomically. It runs with the
+-- caller's permissions (Supabase advises against SECURITY DEFINER in exposed schemas).
 CREATE FUNCTION public.create_listing(
   p_title text, p_company text, p_application_url text, p_work_arrangement text,
   p_deadline date DEFAULT NULL, p_locations jsonb DEFAULT '[]', p_allow_duplicate boolean DEFAULT false
 )
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
   listing_id uuid;
   clean_url text := btrim(p_application_url);
@@ -70,8 +75,8 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Duplicate application URL. Confirm to proceed.' USING ERRCODE = '23505';
   END IF;
-  INSERT INTO public.internship (title, company, application_url, work_arrangement, deadline, created_by, created_at)
-    VALUES (btrim(p_title), btrim(p_company), clean_url, p_work_arrangement, p_deadline, auth.uid(), now())
+  INSERT INTO public.internship (title, company, application_url, work_arrangement, deadline)
+    VALUES (btrim(p_title), btrim(p_company), clean_url, p_work_arrangement, p_deadline)
     RETURNING id INTO listing_id;
   -- For each location, check its value types, then insert the cleaned city/state.
   -- Any failed insert rolls back the listing and its locations together.
@@ -89,11 +94,25 @@ $$;
 REVOKE ALL ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,boolean) TO authenticated;
 
+-- Profiles are public only when their owner shared a resume; owners always see their own.
+-- Approved members create and edit only their own profile.
+GRANT SELECT ON public.profile TO anon, authenticated;
+GRANT INSERT (user_id, first_name, last_name, major), UPDATE (first_name, last_name, major)
+  ON public.profile TO authenticated;
+CREATE POLICY read_profiles ON public.profile FOR SELECT TO anon, authenticated USING (
+  EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id)
+  OR user_id = (SELECT auth.uid())
+);
+CREATE POLICY create_profile ON public.profile FOR INSERT TO authenticated
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY edit_profile ON public.profile FOR UPDATE TO authenticated
+  USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+
 -- Resume listings are public, but only members may change their own metadata.
-GRANT SELECT (first_name, last_name, major, object_path, original_filename, uploaded_at) ON public.resume TO anon;
-GRANT SELECT ON public.resume TO authenticated;
-GRANT INSERT (user_id, first_name, last_name, major, object_path, original_filename),
-  UPDATE (first_name, last_name, major, object_path, original_filename), DELETE
+-- user_id is readable by everyone because it already appears in object_path.
+GRANT SELECT ON public.resume TO anon, authenticated;
+GRANT INSERT (user_id, object_path, original_filename), UPDATE (object_path, original_filename), DELETE
   ON public.resume TO authenticated;
 CREATE POLICY read_resumes ON public.resume FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY create_resume ON public.resume FOR INSERT TO authenticated
@@ -119,23 +138,17 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES ('dsp-public-resumes', 'dsp-public-resumes', true, 500000, ARRAY['application/pdf'])
 ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 500000,
   allowed_mime_types = ARRAY['application/pdf'];
--- Exact paths prevent extra files or nested folders. UPDATE supports replacement.
+-- Members may upload, inspect, and delete PDFs directly inside their own folder.
+-- Files are never overwritten, so there is no UPDATE policy.
 CREATE POLICY upload_resume_file ON storage.objects FOR INSERT TO authenticated WITH CHECK (
   (SELECT private.is_approved_member()) AND bucket_id = 'dsp-public-resumes'
-  AND name = (SELECT auth.uid())::text || '/resume.pdf'
+  AND name ~ ('^' || (SELECT auth.uid())::text || '/[^/]+\.pdf$')
 );
 CREATE POLICY inspect_resume_file ON storage.objects FOR SELECT TO authenticated USING (
   (SELECT private.is_approved_member()) AND bucket_id = 'dsp-public-resumes'
-  AND name = (SELECT auth.uid())::text || '/resume.pdf'
-);
-CREATE POLICY replace_resume_file ON storage.objects FOR UPDATE TO authenticated USING (
-  (SELECT private.is_approved_member()) AND bucket_id = 'dsp-public-resumes'
-  AND name = (SELECT auth.uid())::text || '/resume.pdf'
-) WITH CHECK (
-  (SELECT private.is_approved_member()) AND bucket_id = 'dsp-public-resumes'
-  AND name = (SELECT auth.uid())::text || '/resume.pdf'
+  AND name ~ ('^' || (SELECT auth.uid())::text || '/[^/]+\.pdf$')
 );
 CREATE POLICY delete_resume_file ON storage.objects FOR DELETE TO authenticated USING (
   (SELECT private.is_approved_member()) AND bucket_id = 'dsp-public-resumes'
-  AND name = (SELECT auth.uid())::text || '/resume.pdf'
+  AND name ~ ('^' || (SELECT auth.uid())::text || '/[^/]+\.pdf$')
 );

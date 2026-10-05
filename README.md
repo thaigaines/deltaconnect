@@ -1,11 +1,12 @@
 # DeltaConnect
 
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
-Approved members log in to browse internships with search and filters. Editors
-also add listings (with locations), edit listing details, and archive or restore
-listings. The resume directory at `#/resumes` is public; approved members add or
-update their own resume there. The UI does not yet edit locations after creation
-or delete resumes.
+Approved members log in to an account home page (`#/`) where they set their
+profile (name and major) and upload or replace their resume. They browse
+internships at `#/internships` with search and filters; editors also add listings
+(with locations), edit listing details, and archive or restore listings. The
+resume directory at `#/resumes` is public and searchable by name or major. The UI
+does not yet edit locations after creation or delete resumes.
 
 This README defines the product and database rules. The SQL migrations in
 `supabase/migrations/` implement the database and are the source for column details.
@@ -37,7 +38,8 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 | --- | --- | --- |
 | `public.internship` | Listing content, optional deadline, archive status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
-| `public.resume` | At most one resume per user; name, major, unique object path, original filename, upload time | `user_id` → `auth.users.id`; cascading deletion |
+| `public.profile` | One per user, created on first save; name and major. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
+| `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
 
@@ -46,7 +48,7 @@ spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Access
 
-RLS is enabled on all five tables.
+RLS is enabled on all six tables.
 
 Only owner-allowed accounts are intended to log in for internship access. Provision
 each account with an `approved_member` row before its first login, and disable
@@ -56,7 +58,8 @@ requires the approval row, so an Auth account alone does not grant database acce
 These hosted settings and approvals must be verified separately.
 
 The resume directory and PDF downloads belong on a separate public page and
-require no login. Uploading and managing a resume still requires an approved account.
+require no login. Saving a profile and uploading a resume require an approved
+account, and a resume requires a profile.
 
 Ordinary clients use these permissions:
 
@@ -64,7 +67,8 @@ Ordinary clients use these permissions:
 | --- | --- | --- |
 | Internships | Members see active rows; editors see all rows | Editors create and edit content/archive status; no deletion |
 | Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
-| Resume metadata | Everyone; only authenticated users can select `user_id` | Approved members manage only their own row |
+| Profiles | Everyone, for profiles with a resume; owners see their own | Approved members create and edit only their own row |
+| Resume metadata | Everyone | Approved members manage only their own row |
 | Approval tables | No ordinary client access | Privileged administrator only |
 
 Active means not archived and deadline absent or on/after today in
@@ -102,8 +106,8 @@ because its CDN can serve stale copies. File and database writes are separate:
 handle failures and cleanup in code. Metadata/account deletion does not remove
 Storage files. Revoking membership does not unpublish existing resumes.
 
-**Anyone with the public URL can download a resume.** The UUID is visible in
-`object_path`, even when `user_id` is unavailable.
+**Anyone with the public URL can download a resume.** The owner's UUID is visible
+in `object_path` and `user_id`.
 
 ## Set up the database
 
@@ -112,6 +116,10 @@ order. Never edit a migration a database has already run; add a new one instead.
 On a fresh Supabase project, run them in the SQL Editor as administrator or apply
 them with the Supabase CLI, using one method per project so migration history
 stays consistent. The first migration stops safely if application tables already exist.
+
+To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
+`supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
+accounts), then run the migrations again.
 
 Then configure Auth callback URLs/SMTP, keep `private` outside the Data API, and
 expose the public tables/functions using the explicit grants. Approve existing Auth

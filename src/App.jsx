@@ -1,7 +1,8 @@
 // Top-level component: layout, navigation, login, and access checks.
-// Shows the public resume directory (Resumes.jsx) or the members-only internships (Listings.jsx).
+// Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx) or internships (Listings.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
+import Home from './Home.jsx'
 import Listings from './Listings.jsx'
 import Resumes from './Resumes.jsx'
 
@@ -58,7 +59,10 @@ export default function App() {
 
   // Effects depend on the id, not the session, so re-checking the same user changes nothing.
   const userId = session?.user.id
+  // Any other hash, including none, is the home page.
   const isResumesPage = page === '#/resumes'
+  const isInternshipsPage = page === '#/internships'
+  const isHomePage = !isResumesPage && !isInternshipsPage
 
   // Check member/editor access whenever the user changes or access is refreshed.
   // Clearing first means one account never sees another's access.
@@ -115,10 +119,11 @@ export default function App() {
         <div className="container topbar-inner">
           <div className="brand-nav">
             {/* aria-label gives screen readers the full name behind the Δ symbol. */}
-            <a className="brand" href="#/internships" aria-label="DeltaConnect home">Δ</a>
+            <a className="brand" href="#/" aria-label="DeltaConnect home">Δ</a>
             {/* aria-current marks the active link for screen readers and the CSS highlight. */}
             <nav aria-label="Main navigation">
-              <a href="#/internships" aria-current={!isResumesPage ? 'page' : undefined}>Internships</a>
+              <a href="#/" aria-current={isHomePage ? 'page' : undefined}>Home</a>
+              <a href="#/internships" aria-current={isInternshipsPage ? 'page' : undefined}>Internships</a>
               <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
             </nav>
           </div>
@@ -137,7 +142,7 @@ export default function App() {
         <div className="container">
           <h1>DeltaConnect</h1>
           <p className="tagline">
-            {isResumesPage ? 'Meet the chapter.' : 'Internships curated by our chapter, for our chapter.'}
+            {isResumesPage ? 'Meet the chapter.' : isInternshipsPage ? 'Internships curated by our chapter, for our chapter.' : 'Your chapter account.'}
           </p>
         </div>
       </section>
@@ -145,8 +150,7 @@ export default function App() {
       {/* ----- Main content: the first matching screen wins ----- */}
       <main className="container">
         {isResumesPage ? (
-          // A new key (different account) resets the page and closes any open form.
-          <Resumes key={userId} userId={userId} isMember={permissions?.is_member === true} />
+          <Resumes />
         ) : loadingSession ? (
           <p role="status">Checking login...</p>
         ) : session ? (
@@ -158,8 +162,10 @@ export default function App() {
           ) : !permissions ? (
             <p role="status">Checking access...</p>
           ) : permissions.is_member ? (
-            // A new key replaces Listings with a fresh copy that reloads its data.
-            <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
+            // A new key (other account or access refresh) replaces the page with a fresh copy that reloads its data.
+            isInternshipsPage
+              ? <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
+              : <Home key={`${userId}:${accessCheck}`} userId={userId} />
           ) : (
             <div>
               <p>This account does not have internship access. {accessContact}</p>

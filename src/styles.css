@@ -139,7 +139,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .button-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .button-group button[aria-pressed="true"] { color: var(--purple); background: var(--purple-soft); border-color: var(--purple-line); }
 
-/* Boxed panels: the login card and the add-listing and resume forms. */
+/* Boxed panels: the login card, the add-listing form, and the home page's profile and resume forms. */
 .panel, .login-card {
   padding: 2rem;
   border: 1px solid var(--line);
@@ -153,10 +153,11 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .login-card form { margin-top: 1.5rem; gap: 1rem; }
 
 /* Add/edit listing form (inside .panel when adding, inside the card when editing)
-   and the add/edit resume form (inside .panel). */
-.listing-form, .resume-form { gap: 1rem; }
-.listing-form h3, .resume-form h3 { margin: 0; font-size: 1.25rem; }
-.resume-form p { margin: 0; }
+   and the home page's profile and resume forms (inside .panel, kept to a readable width). */
+.listing-form, .account-form { gap: 1rem; }
+.listing-form h3, .account-form h3 { margin: 0; font-size: 1.25rem; }
+.account-form { max-width: 32rem; }
+.account-form p { margin: 0; }
 input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker text in the taller input */
 .checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 .checkbox input { width: auto; min-height: 0; }
