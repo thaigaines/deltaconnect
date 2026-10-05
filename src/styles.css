@@ -46,7 +46,9 @@ a { color: var(--purple); text-underline-offset: 0.2em; }
 /* ============================================================
    Top bar: Δ mark and navigation on the left, account on the right
    ============================================================ */
-.topbar { border-bottom: 1px solid var(--line); }
+/* sticky keeps the bar at the top while scrolling; the solid background and
+   z-index stop page content from showing through or covering it. */
+.topbar { position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--line); background: var(--bg); }
 .topbar-inner, .brand-nav, .account {
   display: flex;
   flex-wrap: wrap; /* items move to a new line on narrow screens */
