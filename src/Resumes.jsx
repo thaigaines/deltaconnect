@@ -1,6 +1,6 @@
 // Public resume directory (no login needed). Members can also add or edit their own resume.
 import { useEffect, useState } from 'react'
-import { supabase, resumeBucket, resumePath } from './supabase.js'
+import { supabase, resumeBucket } from './supabase.js'
 import ResumeForm from './ResumeForm.jsx'
 
 // ---------- Component ----------
@@ -41,8 +41,8 @@ export default function Resumes({ userId, isMember }) {
   }, [refresh])
 
   // ---------- Derived values ----------
-  // The member's own row, found by its fixed path; undefined if they have none.
-  const myResume = resumes.find((resume) => resume.object_path === resumePath(userId))
+  // The member's own row, found by their folder in the path; undefined if they have none.
+  const myResume = resumes.find((resume) => resume.object_path.startsWith(`${userId}/`))
 
   // ---------- Event handlers ----------
   function handleSaved() {
@@ -54,10 +54,10 @@ export default function Resumes({ userId, isMember }) {
   return (
     <section aria-labelledby="resumes-heading">
       {/* ----- Heading and actions ----- */}
-      {/* Disabled while loading, so it never says "Add" to a member who has a resume. */}
       <div className="section-head">
         <h2 id="resumes-heading">Public resumes</h2>
         <div className="actions">
+          {/* Disabled while loading, so it never says "Add" to a member who has a resume. */}
           {isMember && (
             <button type="button" disabled={loading} onClick={() => setFormOpen(true)}>
               {myResume ? 'Edit resume' : 'Add resume'}
@@ -89,7 +89,7 @@ export default function Resumes({ userId, isMember }) {
             const { data } = supabase.storage.from(resumeBucket).getPublicUrl(resume.object_path)
             const name = `${resume.first_name} ${resume.last_name}`
             return (
-              <li key={resume.object_path}>
+              <li key={resume.object_path} className="resume-card">
                 {/* Browser PDF preview (#settings: fit page, no toolbar), skipped by Tab and screen readers.
                     The link covers it, so a click anywhere opens the PDF in a new tab. */}
                 <div className="resume-preview">

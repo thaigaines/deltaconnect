@@ -5,6 +5,12 @@ import { supabase } from './supabase.js'
 import Listings from './Listings.jsx'
 import Resumes from './Resumes.jsx'
 
+// ---------- Helpers ----------
+// How to get an account; shown on the login card and to accounts without access.
+const accessContact = (
+  <>Chapter access is by invitation. Email <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> for access.</>
+)
+
 export default function App() {
   // ---------- State ----------
   // useState returns [value, setter]; calling the setter re-renders the component.
@@ -108,7 +114,8 @@ export default function App() {
       <header className="topbar">
         <div className="container topbar-inner">
           <div className="brand-nav">
-            <a className="brand" href="#/internships">DeltaConnect</a>
+            {/* aria-label gives screen readers the full name behind the Δ symbol. */}
+            <a className="brand" href="#/internships" aria-label="DeltaConnect home">Δ</a>
             {/* aria-current marks the active link for screen readers and the CSS highlight. */}
             <nav aria-label="Main navigation">
               <a href="#/internships" aria-current={!isResumesPage ? 'page' : undefined}>Internships</a>
@@ -155,14 +162,14 @@ export default function App() {
             <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
           ) : (
             <div>
-              <p>This account does not have internship access. Email <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> for access.</p>
+              <p>This account does not have internship access. {accessContact}</p>
               <button type="button" onClick={refreshAccess}>Refresh access</button>
             </div>
           )
         ) : (
           <section className="login-card" aria-labelledby="login-heading">
             <h2 id="login-heading">Member login</h2>
-            <p>Chapter access is by invitation. Contact the owner for an account.</p>
+            <p>{accessContact}</p>
             <form onSubmit={handleLogin}>
               <label>
                 Email

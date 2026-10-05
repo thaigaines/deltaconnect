@@ -4,8 +4,16 @@ import { supabase } from './supabase.js'
 
 // ---------- Helpers ----------
 
+// US state and territory codes the database accepts (same list as the migration).
+const stateCodes = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
+  'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM',
+  'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
+  'WV', 'WI', 'WY', 'AS', 'GU', 'MP', 'PR', 'VI',
+]
+
 // 'Boston, ma; New York, NY' -> [{ city: 'Boston', state: 'MA' }, { city: 'New York', state: 'NY' }]
-// Blank entries are skipped; a missing city or state becomes '' for handleSubmit to reject.
+// Blank entries and repeats are skipped; a missing city or state becomes '' for handleSubmit to reject.
 function parseLocations(text) {
   return text.split(';')
     .map((entry) => entry.trim())
@@ -14,6 +22,9 @@ function parseLocations(text) {
       const [city = '', state = ''] = entry.split(',').map((part) => part.trim())
       return { city, state: state.toUpperCase() }
     })
+    // Keep only the first copy, since the database rejects a repeated location.
+    .filter((location, index, all) =>
+      all.findIndex((other) => other.city === location.city && other.state === location.state) === index)
 }
 
 // Saves a listing and its locations together (all or nothing). Returns the error, or null.
@@ -70,14 +81,21 @@ export default function ListingForm({ listing, onClose, onSaved }) {
       setErrorMessage('Write each location as City, ST and separate them with semicolons.')
       return
     }
+    const badState = parsed.find((location) => !stateCodes.includes(location.state))
+    if (badState) {
+      setErrorMessage(`"${badState.state}" is not a US state or territory code. Use two letters, like MA.`)
+      return
+    }
 
     let error
     setBusy(true)
     if (isNew) {
-      // 23505 means duplicate URL: ask, then retry with the override.
+      // 23505 means duplicate URL: ask, then retry with the override or stop.
       error = await createListing(fields, parsed, false)
-      if (error?.code === '23505' && window.confirm('A listing with this application URL already exists. Add it anyway?')) {
-        error = await createListing(fields, parsed, true)
+      if (error?.code === '23505') {
+        error = window.confirm('A listing with this application URL already exists. Add it anyway?')
+          ? await createListing(fields, parsed, true)
+          : { message: 'Not added: a listing with this application URL already exists.' }
       }
     } else {
       const result = await supabase

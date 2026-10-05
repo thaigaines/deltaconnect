@@ -1,10 +1,11 @@
 # DeltaConnect
 
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
-The React/JavaScript frontend supports invited-account login, member/editor
-internship browsing with search and filters, and a public resume directory at
-`#/resumes`. Editors can add listings (with locations), edit listing details, and
-archive or restore listings. Editing locations after creation is deferred.
+Approved members log in to browse internships with search and filters. Editors
+also add listings (with locations), edit listing details, and archive or restore
+listings. The resume directory at `#/resumes` is public; approved members add or
+update their own resume there. The UI does not yet edit locations after creation
+or delete resumes.
 
 This README defines the product and database rules. The SQL migrations in
 `supabase/migrations/` implement the database and are the source for column details.
@@ -29,8 +30,6 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 Restart Vite after changing these values. Use the publishable key; service-role
 and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
-
-Python may be added for supporting tasks such as data imports when needed.
 
 ## Tables
 
@@ -63,7 +62,7 @@ Ordinary clients use these permissions:
 
 | Resource | Read | Write |
 | --- | --- | --- |
-| Internships | Members see active rows; editors see all rows | Editors create through `create_listing()` and edit content/archive status; no deletion |
+| Internships | Members see active rows; editors see all rows | Editors create and edit content/archive status; no deletion |
 | Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
 | Resume metadata | Everyone; only authenticated users can select `user_id` | Approved members manage only their own row |
 | Approval tables | No ordinary client access | Privileged administrator only |
@@ -74,8 +73,11 @@ still leaves it hidden from regular members. No scheduled deletion is needed.
 
 `my_permissions()` reports the signed-in user's approval. Editors must first be
 members; removing membership removes editor approval. Keep `private` unexposed.
-Listing creation and its initial locations are atomic. Duplicate URLs require an
-explicit `p_allow_duplicate = true` override; duplicate matches include hidden rows.
+The app creates listings through `create_listing()`, which saves a listing and its
+initial locations atomically and runs with the caller's permissions (Supabase
+advises against `security definer` functions in exposed schemas). Duplicate URLs
+require an explicit `p_allow_duplicate = true` override; duplicate matches include
+hidden rows.
 Audit fields cannot be changed through ordinary client writes.
 
 ## Listing presentation
@@ -91,27 +93,25 @@ Audit fields cannot be changed through ordinary client writes.
 | Bucket | `dsp-public-resumes` |
 | Access | Public |
 | MIME type / file limit | `application/pdf` / 500,000 bytes |
-| Exact file and metadata path | `<user-id>/resume.pdf` |
+| File and metadata path | `<user-id>/<random-id>.pdf` |
 
-Approved members can upload, inspect, replace, and delete only their own file.
-Upload first, then save metadata. Replacement updates the file at the same path;
-update the metadata afterward to refresh `uploaded_at`. File and database writes
-are separate: handle failures and cleanup in code. Metadata/account deletion does
-not remove Storage files. Revoking membership does not unpublish existing resumes.
+Approved members can upload, inspect, and delete only PDFs in their own folder.
+Upload first, then save metadata. Replacing a resume uploads to a new path, saves
+the metadata, then removes the old file; Supabase advises against overwriting
+because its CDN can serve stale copies. File and database writes are separate:
+handle failures and cleanup in code. Metadata/account deletion does not remove
+Storage files. Revoking membership does not unpublish existing resumes.
 
 **Anyone with the public URL can download a resume.** The UUID is visible in
 `object_path`, even when `user_id` is unavailable.
 
 ## Set up the database
 
-Each migration is a SQL script that makes one change to the database schema. Run
-in filename order, they build the current schema step by step. Never edit a
-migration a database has already run; add a new one instead.
-
-On a fresh Supabase project, run each file in `supabase/migrations/` in filename
-order in the SQL Editor as administrator, or apply them with the Supabase CLI.
-Use one method per project so migration history stays consistent. The first
-migration stops safely if application tables already exist.
+The SQL scripts in `supabase/migrations/` build the schema when run in filename
+order. Never edit a migration a database has already run; add a new one instead.
+On a fresh Supabase project, run them in the SQL Editor as administrator or apply
+them with the Supabase CLI, using one method per project so migration history
+stays consistent. The first migration stops safely if application tables already exist.
 
 Then configure Auth callback URLs/SMTP, keep `private` outside the Data API, and
 expose the public tables/functions using the explicit grants. Approve existing Auth

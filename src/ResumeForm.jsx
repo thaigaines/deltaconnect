@@ -1,7 +1,7 @@
 // Member form to add a resume (no resume prop) or edit one; a new PDF is optional when editing.
 // RLS still decides if each write is allowed.
 import { useState } from 'react'
-import { supabase, resumeBucket, resumePath } from './supabase.js'
+import { supabase, resumeBucket } from './supabase.js'
 
 // ---------- Component ----------
 // userId: the member's id. resume: their current row, or null.
@@ -39,15 +39,17 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
       return
     }
 
-    const path = resumePath(userId)
+    // Every upload gets a new path. Supabase advises against overwriting a file because
+    // its CDN can keep serving the old copy for a while.
+    const path = `${userId}/${crypto.randomUUID()}.pdf`
     const storage = supabase.storage.from(resumeBucket)
     // Holds the first failure; later steps run only while it's null.
     let error = null
     setBusy(true)
 
-    // Upload first. upsert overwrites the old file in place, so there's never a gap.
+    // Upload first, so the details never point to a missing file.
     if (file) {
-      const upload = await storage.upload(path, file, { upsert: true, contentType: 'application/pdf' })
+      const upload = await storage.upload(path, file, { contentType: 'application/pdf' })
       error = upload.error
     }
 
@@ -59,10 +61,14 @@ export default function ResumeForm({ userId, resume, onClose, onSaved }) {
         : await supabase.from('resume').update(fields).eq('user_id', userId)
       error = result.error
 
-      // Remove the file if a first save failed, unless the row already exists (23505).
-      if (error && isNew && error.code !== '23505') {
-        const cleanup = await storage.remove([path])
-        if (cleanup.error) error = { message: `${error.message} The uploaded file could not be removed; please try again.` }
+      // Clean up whichever file is no longer used: the new one if saving failed,
+      // or the old one if a replacement saved.
+      const unused = error ? path : resume?.object_path
+      if (file && unused) {
+        const cleanup = await storage.remove([unused])
+        if (cleanup.error) {
+          error = { message: error ? `${error.message} The uploaded file could not be removed.` : 'Saved, but the old file could not be removed.' }
+        }
       }
     }
     setBusy(false)

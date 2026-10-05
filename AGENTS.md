@@ -13,7 +13,7 @@
 
 Read `README.md` before changing listing behavior, authentication, roles, resumes, or database access. It is the authoritative source for current rules; migrations implement the database and define columns. Distinguish intended rules, local verification, and hosted state.
 
-Use owner-controlled accounts: allowed users browse internships immediately after login, with approval handled during account provisioning rather than a separate approval flow in the UI. Keep the resume directory and downloads on a separate public page accessible without login. Follow `README.md` for provisioning and editor permissions.
+Accounts are provisioned by the owner as described in `README.md`, so the UI has no approval flow. Keep the resume directory and downloads on a separate public page accessible without login.
 
 DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 
@@ -23,7 +23,7 @@ Use JavaScript and pnpm with its lockfile; `package.json` defines dependencies a
 
 Supabase handles authentication, database access, and Storage; the React frontend calls it directly, with no separate backend server. Add Python supporting scripts only for concrete tasks such as data imports.
 
-Keep the UI dark and minimal. Use purple only for active, actionable, or urgent elements, and add no decorative extras unless requested.
+Keep the UI dark and minimal. Use purple only for active, actionable, or urgent elements (the hero's faint glow is the one requested exception), and add no decorative extras unless requested. Only clickable elements react to hover.
 
 The SQL setup does not automatically connect the frontend. Use user-scoped access so Supabase enforces permissions. Keep credentials outside source and fixtures. Create listings and initial locations atomically. Validate and clean input before writes; constraints enforce stored values. Reads assume valid records and perform only type conversion and presentation formatting.
 
@@ -31,4 +31,4 @@ The SQL setup does not automatically connect the frontend. Use user-scoped acces
 
 Check affected validation, presentation, permissions, and failure cases against `README.md`, including date boundaries, denied access, atomic creation rollback, and file/database cleanup. Distinguish local checks from hosted verification.
 
-Keep setup documentation concise and use DeltaConnect consistently.
+Keep setup documentation concise. Use the name DeltaConnect in text; the top bar and browser tab show the Δ mark.

@@ -44,7 +44,7 @@ a { color: var(--purple); text-underline-offset: 0.2em; }
 }
 
 /* ============================================================
-   Top bar: name and navigation on the left, account on the right
+   Top bar: Δ mark and navigation on the left, account on the right
    ============================================================ */
 .topbar { border-bottom: 1px solid var(--line); }
 .topbar-inner, .brand-nav, .account {
@@ -54,7 +54,8 @@ a { color: var(--purple); text-underline-offset: 0.2em; }
 }
 .topbar-inner { justify-content: space-between; gap: 1rem; padding-block: 1rem; }
 .brand-nav { gap: 1.75rem; }
-.brand { color: var(--text); font-weight: 600; text-decoration: none; }
+/* The Δ mark, sized up so the lone symbol reads as the logo. */
+.brand { color: var(--text); font-size: 1.5rem; font-weight: 600; line-height: 1; text-decoration: none; }
 nav { display: flex; gap: 0.25rem; }
 nav a {
   padding: 0.5rem 0.875rem;
@@ -191,9 +192,10 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
   border-radius: 1.125rem;
   background: var(--surface);
   overflow-wrap: anywhere; /* long URLs or names wrap instead of overflowing */
-  transition: border-color 0.15s, transform 0.15s, background-color 0.15s;
 }
-.results > li:hover { border-color: var(--purple-line); background: var(--surface-hover); transform: translateY(-2px); }
+/* Only resume cards open something when clicked, so only they react to hover. */
+.resume-card { transition: border-color 0.15s, transform 0.15s, background-color 0.15s; }
+.resume-card:hover { border-color: var(--purple-line); background: var(--surface-hover); transform: translateY(-2px); }
 .results h3 { margin: 0; font-size: 1.3125rem; }
 .results p { margin: 0; }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }
