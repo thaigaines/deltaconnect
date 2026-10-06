@@ -107,8 +107,8 @@ main { padding-bottom: 6rem; }
    ============================================================ */
 form, label, .filter-group { display: grid; gap: 0.375rem; }
 label, .filter-group { color: var(--muted); font-size: 0.75rem; font-weight: 500; }
-input, select, button { font: inherit; min-height: 2.75rem; } /* 44px: comfortable touch target */
-input, select {
+input, select, textarea, button { font: inherit; min-height: 2.75rem; } /* 44px: comfortable touch target */
+input, select, textarea {
   width: 100%;
   min-width: 0;
   padding: 0 0.875rem;
@@ -119,6 +119,7 @@ input, select {
   font-size: 0.9375rem;
 }
 input::placeholder { color: var(--faint); }
+textarea { padding-block: 0.625rem; resize: vertical; } /* multi-line text grows downward only */
 button {
   padding: 0 1rem;
   border: 1px solid var(--line-strong);
@@ -154,7 +155,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 
 /* Add/edit listing form (inside .panel when adding, inside the card when editing)
    and the home page's profile and resume forms (inside .panel, kept to a readable width). */
-.listing-form, .account-form { gap: 1rem; }
+.listing-form, .account-form, .forum-form { gap: 1rem; }
 .listing-form h3, .account-form h3 { margin: 0; font-size: 1.25rem; }
 .account-form { max-width: 32rem; }
 .account-form p { margin: 0; }
@@ -225,6 +226,25 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
   transition: background-color 0.15s;
 }
 .apply:hover { background: var(--purple-soft); }
+
+/* ============================================================
+   Forum: posts and comments stacked in one column
+   ============================================================ */
+.forum-list { display: grid; gap: 0.75rem; margin: 1.75rem 0 0; padding: 0; list-style: none; }
+.forum-list > li {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1.125rem;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.forum-list h3 { margin: 0; font-size: 1.125rem; }
+.forum-list p, .forum-post p { margin: 0; }
+.forum-post { display: grid; gap: 0.5rem; overflow-wrap: anywhere; }
+.forum-post h2 { margin: 0; }
+.forum-body { white-space: pre-wrap; } /* keeps the line breaks the author typed */
 
 /* ============================================================
    Chips: small labels for deadlines and editor status

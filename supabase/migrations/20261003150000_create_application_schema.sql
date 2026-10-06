@@ -29,6 +29,10 @@ CREATE TABLE private.approved_member (
 CREATE TABLE private.approved_editor (
   user_id uuid PRIMARY KEY REFERENCES private.approved_member(user_id) ON DELETE CASCADE
 );
+-- Moderators are editors who can also remove any forum post or comment.
+CREATE TABLE private.approved_moderator (
+  user_id uuid PRIMARY KEY REFERENCES private.approved_editor(user_id) ON DELETE CASCADE
+);
 -- One profile per user, created when the member first saves it. New user details become columns here.
 CREATE TABLE public.profile (
   user_id uuid PRIMARY KEY DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -45,15 +49,41 @@ CREATE TABLE public.resume (
   -- Each upload gets a new '<user-id>/<name>.pdf' path (Supabase advises against overwriting).
   CONSTRAINT resume_object_path_check CHECK (object_path ~ ('^' || user_id::text || '/[^/]+\.pdf$'))
 );
+-- Members-only forum: posts with a flat list of comments. Authors need a profile, which supplies
+-- their name. edited_at stays null until the author first changes the text.
+CREATE TABLE public.forum_post (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profile(user_id) ON DELETE CASCADE,
+  title text NOT NULL CHECK (title = btrim(title) AND title ~ '[^[:space:]]' AND char_length(title) <= 200),
+  body text NOT NULL CHECK (body = btrim(body) AND body ~ '[^[:space:]]' AND char_length(body) <= 10000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  edited_at timestamptz
+);
+CREATE TABLE public.forum_comment (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  forum_post_id uuid NOT NULL REFERENCES public.forum_post(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profile(user_id) ON DELETE CASCADE,
+  body text NOT NULL CHECK (body = btrim(body) AND body ~ '[^[:space:]]' AND char_length(body) <= 5000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  edited_at timestamptz
+);
 -- Supabase's advisor flags foreign keys without an index.
 CREATE INDEX internship_created_by_idx ON public.internship(created_by);
 CREATE INDEX internship_application_url_idx ON public.internship(application_url);
+CREATE INDEX forum_post_user_id_idx ON public.forum_post(user_id);
+CREATE INDEX forum_comment_forum_post_id_idx ON public.forum_comment(forum_post_id);
+CREATE INDEX forum_comment_user_id_idx ON public.forum_comment(user_id);
 ALTER TABLE public.internship ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.internship_location ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resume ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.forum_post ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.forum_comment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.approved_member ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.approved_editor ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.approved_moderator ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON private.approved_member, private.approved_editor FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON public.internship, public.internship_location, public.profile, public.resume FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON private.approved_member, private.approved_editor, private.approved_moderator
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON public.internship, public.internship_location, public.profile, public.resume,
+  public.forum_post, public.forum_comment FROM PUBLIC, anon, authenticated;

@@ -4,9 +4,11 @@ Internship listings and a public resume directory for one Delta Sigma Pi chapter
 Approved members log in to an account home page (`#/`) where they set their
 profile (name and major) and upload or replace their resume. They browse
 internships at `#/internships` with search and filters; editors also add listings
-(with locations), edit listing details, and archive or restore listings. The
-resume directory at `#/resumes` is public and searchable by name or major. The UI
-does not yet edit locations after creation or delete resumes.
+(with locations), edit listing details, and archive or restore listings. Members
+post topics and comment at `#/forum` (each post at `#/forum/<id>`); moderators can
+remove any post or comment. The resume directory at `#/resumes` is public and
+searchable by name or major. The UI does not yet edit locations after creation or
+delete resumes.
 
 This README defines the product and database rules. The SQL migrations in
 `supabase/migrations/` implement the database and are the source for column details.
@@ -40,15 +42,18 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
 | `public.profile` | One per user, created on first save; name and major. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
 | `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |
+| `public.forum_post` | Title, body, creation time, and `edited_at` (set when the text changes) | `user_id` → `profile.user_id`; cascading deletion |
+| `public.forum_comment` | Body, creation time, and `edited_at`; a flat list under one post | `forum_post_id` → `forum_post.id`, `user_id` → `profile.user_id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
+| `private.approved_moderator` | Moderators, who must also be editors | `user_id` → `approved_editor.user_id`; cascading deletion |
 
 Zero location rows means no city/state was specified. Use consistent city
 spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Access
 
-RLS is enabled on all six tables.
+RLS is enabled on all nine tables.
 
 Only owner-allowed accounts are intended to log in for internship access. Provision
 each account with an `approved_member` row before its first login, and disable
@@ -67,7 +72,8 @@ Ordinary clients use these permissions:
 | --- | --- | --- |
 | Internships | Members see active rows; editors see all rows | Editors create and edit content/archive status; no deletion |
 | Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
-| Profiles | Everyone, for profiles with a resume; owners see their own | Approved members create and edit only their own row |
+| Profiles | Visitors: profiles with a resume. Members: all profiles. Owners: their own | Approved members create and edit only their own row |
+| Forum posts and comments | Members only | Members create, edit, and delete their own (a profile is required); moderators delete any. Edits set `edited_at` |
 | Resume metadata | Everyone | Approved members manage only their own row |
 | Approval tables | No ordinary client access | Privileged administrator only |
 
@@ -75,8 +81,9 @@ Active means not archived and deadline absent or on/after today in
 `America/New_York`. Expiration is calculated on reads; restoring an expired listing
 still leaves it hidden from regular members. No scheduled deletion is needed.
 
-`my_permissions()` reports the signed-in user's approval. Editors must first be
-members; removing membership removes editor approval. Keep `private` unexposed.
+`my_permissions()` reports the signed-in user's approval. Roles stack: editors must
+first be members, and moderators must first be editors, so removing a role removes
+the roles above it. Moderators can do everything editors can, plus forum moderation. Keep `private` unexposed.
 The app creates listings through `create_listing()`, which saves a listing and its
 initial locations atomically and runs with the caller's permissions (Supabase
 advises against `security definer` functions in exposed schemas). Duplicate URLs
@@ -119,10 +126,10 @@ stays consistent. The first migration stops safely if application tables already
 
 To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
 `supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
-accounts), then run the migrations again.
+accounts), then run the migrations again and re-approve accounts.
 
 Then configure Auth callback URLs/SMTP, keep `private` outside the Data API, and
 expose the public tables/functions using the explicit grants. Approve existing Auth
-UUIDs as members, then editors, using an administrator session. `supabase/seed.sql`
+UUIDs as members, then editors, then moderators, using an administrator session. `supabase/seed.sql`
 optionally adds fictional listings after setting `app.seed_editor_id` to an approved
 test editor UUID in the same SQL session. No credentials or real user data are seeded.

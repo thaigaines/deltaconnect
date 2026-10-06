@@ -1,7 +1,10 @@
 // Top-level component: layout, navigation, login, and access checks.
-// Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx) or internships (Listings.jsx).
+// Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx),
+// internships (Listings.jsx), or forum (Forum.jsx, ForumPost.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
+import Forum from './Forum.jsx'
+import ForumPost from './ForumPost.jsx'
 import Home from './Home.jsx'
 import Listings from './Listings.jsx'
 import Resumes from './Resumes.jsx'
@@ -9,7 +12,7 @@ import Resumes from './Resumes.jsx'
 // ---------- Helpers ----------
 // How to get an account; shown on the login card and to accounts without access.
 const accessContact = (
-  <>Chapter access is by invitation. Email <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> for access.</>
+  <>Access by invitation only. Contact <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> if interested.</>
 )
 
 export default function App() {
@@ -59,10 +62,12 @@ export default function App() {
 
   // Effects depend on the id, not the session, so re-checking the same user changes nothing.
   const userId = session?.user.id
-  // Any other hash, including none, is the home page.
+  // '#/forum/<id>' opens one post. Any other hash, including none, is the home page.
   const isResumesPage = page === '#/resumes'
   const isInternshipsPage = page === '#/internships'
-  const isHomePage = !isResumesPage && !isInternshipsPage
+  const forumPostId = page.startsWith('#/forum/') ? page.slice('#/forum/'.length) : null
+  const isForumPage = page === '#/forum' || forumPostId !== null
+  const isHomePage = !isResumesPage && !isInternshipsPage && !isForumPage
 
   // Check member/editor access whenever the user changes or access is refreshed.
   // Clearing first means one account never sees another's access.
@@ -84,6 +89,14 @@ export default function App() {
     loadPermissions()
     return () => { cancelled = true }
   }, [userId, accessCheck])
+
+  // The members-only page for this address. A new key (other account, access refresh, or post)
+  // replaces it with a fresh copy that reloads its data.
+  const memberKey = `${userId}:${accessCheck}`
+  const memberPage = isInternshipsPage ? <Listings key={memberKey} isEditor={permissions?.is_editor} />
+    : forumPostId ? <ForumPost key={`${memberKey}:${forumPostId}`} postId={forumPostId} userId={userId} isModerator={permissions?.is_moderator} />
+    : isForumPage ? <Forum key={memberKey} />
+    : <Home key={memberKey} userId={userId} />
 
   // ---------- Event handlers ----------
   function refreshAccess() {
@@ -124,6 +137,7 @@ export default function App() {
             <nav aria-label="Main navigation">
               <a href="#/" aria-current={isHomePage ? 'page' : undefined}>Home</a>
               <a href="#/internships" aria-current={isInternshipsPage ? 'page' : undefined}>Internships</a>
+              <a href="#/forum" aria-current={isForumPage ? 'page' : undefined}>Forum</a>
               <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
             </nav>
           </div>
@@ -142,7 +156,10 @@ export default function App() {
         <div className="container">
           <h1>DeltaConnect</h1>
           <p className="tagline">
-            {isResumesPage ? 'Meet the chapter.' : isInternshipsPage ? 'Internships curated by our chapter, for our chapter.' : 'Your chapter account.'}
+            {isResumesPage ? 'Meet the chapter.'
+              : isInternshipsPage ? 'Internships curated by our chapter, for our chapter.'
+              : isForumPage ? 'Questions and conversations for our chapter.'
+              : 'Your chapter account.'}
           </p>
         </div>
       </section>
@@ -162,10 +179,7 @@ export default function App() {
           ) : !permissions ? (
             <p role="status">Checking access...</p>
           ) : permissions.is_member ? (
-            // A new key (other account or access refresh) replaces the page with a fresh copy that reloads its data.
-            isInternshipsPage
-              ? <Listings key={`${userId}:${accessCheck}`} isEditor={permissions.is_editor} />
-              : <Home key={`${userId}:${accessCheck}`} userId={userId} />
+            memberPage
           ) : (
             <div>
               <p>This account does not have internship access. {accessContact}</p>

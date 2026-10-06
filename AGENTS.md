@@ -11,9 +11,9 @@
 
 ## Product and database rules
 
-Read `README.md` before changing listing behavior, authentication, roles, profiles, resumes, or database access. It is the authoritative source for current rules; migrations implement the database and define columns. Distinguish intended rules, local verification, and hosted state.
+Read `README.md` before changing listing behavior, authentication, roles, profiles, resumes, the forum, or database access. It is the authoritative source for current rules; migrations implement the database and define columns. Distinguish intended rules, local verification, and hosted state.
 
-Accounts are provisioned by the owner as described in `README.md`, so the UI has no approval flow. Members manage their profile and resume on the account home page. Keep the resume directory and downloads on a separate public page accessible without login.
+Accounts are provisioned by the owner as described in `README.md`, so the UI has no approval flow. Members manage their profile and resume on the account home page and talk on the members-only forum, which moderators (above editors) moderate. Keep the resume directory and downloads on a separate public page accessible without login.
 
 DeltaConnect serves one Delta Sigma Pi chapter. Keep multi-chapter support, saved listings, application tracking, notifications, scraping, and deployment choices outside scope unless requested.
 

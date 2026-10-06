@@ -1,19 +1,25 @@
--- Enforces member/editor access and ownership rules for profiles and public resume storage.
+-- Enforces member/editor/moderator access and ownership rules for profiles, the forum,
+-- and public resume storage.
 CREATE FUNCTION private.is_approved_member()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_member WHERE user_id = auth.uid()); $$;
 CREATE FUNCTION private.is_approved_editor()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_editor WHERE user_id = auth.uid()); $$;
-REVOKE ALL ON FUNCTION private.is_approved_member(), private.is_approved_editor() FROM PUBLIC, anon, authenticated, service_role;
+CREATE FUNCTION private.is_approved_moderator()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_moderator WHERE user_id = auth.uid()); $$;
+REVOKE ALL ON FUNCTION private.is_approved_member(), private.is_approved_editor(), private.is_approved_moderator()
+  FROM PUBLIC, anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA private TO authenticated;
-GRANT EXECUTE ON FUNCTION private.is_approved_member(), private.is_approved_editor() TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_approved_member(), private.is_approved_editor(), private.is_approved_moderator()
+  TO authenticated;
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 
 CREATE FUNCTION public.my_permissions()
-RETURNS TABLE (is_member boolean, is_editor boolean)
+RETURNS TABLE (is_member boolean, is_editor boolean, is_moderator boolean)
 LANGUAGE sql STABLE SET search_path = ''
-AS $$ SELECT private.is_approved_member(), private.is_approved_editor(); $$;
+AS $$ SELECT private.is_approved_member(), private.is_approved_editor(), private.is_approved_moderator(); $$;
 REVOKE ALL ON FUNCTION public.my_permissions() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.my_permissions() TO authenticated;
 
@@ -94,20 +100,70 @@ $$;
 REVOKE ALL ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_listing(text,text,text,text,date,jsonb,boolean) TO authenticated;
 
--- Profiles are public only when their owner shared a resume; owners always see their own.
--- Approved members create and edit only their own profile.
+-- Visitors see only profiles whose owner shared a resume. Members see every profile (forum
+-- author names); anyone signed in sees their own. Approved members create and edit only their own.
+-- anon cannot call private functions, so each role gets its own policy.
 GRANT SELECT ON public.profile TO anon, authenticated;
 GRANT INSERT (user_id, first_name, last_name, major), UPDATE (first_name, last_name, major)
   ON public.profile TO authenticated;
-CREATE POLICY read_profiles ON public.profile FOR SELECT TO anon, authenticated USING (
-  EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id)
+CREATE POLICY read_public_profiles ON public.profile FOR SELECT TO anon
+  USING (EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id));
+CREATE POLICY read_profiles ON public.profile FOR SELECT TO authenticated USING (
+  (SELECT private.is_approved_member())
   OR user_id = (SELECT auth.uid())
+  OR EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id)
 );
 CREATE POLICY create_profile ON public.profile FOR INSERT TO authenticated
   WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
 CREATE POLICY edit_profile ON public.profile FOR UPDATE TO authenticated
   USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
   WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+
+-- Forum: only members read. Members write their own posts and comments; authors or moderators delete.
+-- created_at and edited_at are not client-writable.
+GRANT SELECT, DELETE ON public.forum_post, public.forum_comment TO authenticated;
+GRANT INSERT (user_id, title, body), UPDATE (title, body) ON public.forum_post TO authenticated;
+GRANT INSERT (forum_post_id, user_id, body), UPDATE (body) ON public.forum_comment TO authenticated;
+CREATE POLICY read_forum_posts ON public.forum_post FOR SELECT TO authenticated
+  USING ((SELECT private.is_approved_member()));
+CREATE POLICY create_forum_post ON public.forum_post FOR INSERT TO authenticated
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY edit_forum_post ON public.forum_post FOR UPDATE TO authenticated
+  USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY delete_forum_post ON public.forum_post FOR DELETE TO authenticated USING (
+  ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  OR (SELECT private.is_approved_moderator())
+);
+CREATE POLICY read_forum_comments ON public.forum_comment FOR SELECT TO authenticated
+  USING ((SELECT private.is_approved_member()));
+CREATE POLICY create_forum_comment ON public.forum_comment FOR INSERT TO authenticated
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY edit_forum_comment ON public.forum_comment FOR UPDATE TO authenticated
+  USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY delete_forum_comment ON public.forum_comment FOR DELETE TO authenticated USING (
+  ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  OR (SELECT private.is_approved_moderator())
+);
+
+-- Marks a post or comment as edited when its text changes. Comments have no title, so
+-- to_jsonb reads title as null for both versions of a comment.
+CREATE FUNCTION private.stamp_forum_edit()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  IF NEW.body IS DISTINCT FROM OLD.body
+    OR to_jsonb(NEW) ->> 'title' IS DISTINCT FROM to_jsonb(OLD) ->> 'title' THEN
+    NEW.edited_at := now();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.stamp_forum_edit() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER stamp_forum_post_edit BEFORE UPDATE ON public.forum_post
+  FOR EACH ROW EXECUTE FUNCTION private.stamp_forum_edit();
+CREATE TRIGGER stamp_forum_comment_edit BEFORE UPDATE ON public.forum_comment
+  FOR EACH ROW EXECUTE FUNCTION private.stamp_forum_edit();
 
 -- Resume listings are public, but only members may change their own metadata.
 -- user_id is readable by everyone because it already appears in object_path.
