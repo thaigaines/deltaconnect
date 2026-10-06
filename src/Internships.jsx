@@ -1,9 +1,13 @@
-// Internships page (members only): loads listings, then search and filters.
+// Internships page (members only): loads listings, then search and filters. Members can suggest
+// internships; editors review suggestions and add listings.
 // RLS decides which rows come back: members get active listings, editors get all of them.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import InternshipForm from './InternshipForm.jsx'
+import SuggestionForm from './SuggestionForm.jsx'
+import Suggestions from './Suggestions.jsx'
 import { loadRows } from './loadRows.js'
+import { friendlyError } from './errors.js'
 
 // ---------- Helpers ----------
 // Plain functions outside the component, so they aren't recreated on every render.
@@ -58,7 +62,7 @@ function deadlineLabel(deadline) {
 }
 
 // ---------- Component ----------
-// isEditor: editors can add and edit listings and see status chips.
+// isEditor: editors can add and edit listings, review suggestions, and see status chips.
 export default function Internships({ isEditor }) {
   // ---------- State ----------
   const [listings, setListings] = useState([])
@@ -72,8 +76,13 @@ export default function Internships({ isEditor }) {
   const [location, setLocation] = useState('')
   const [arrangement, setArrangement] = useState('')
 
-  // Editor form: null = closed, { listing: null } = adding, { listing } = editing it.
+  // Editor form: null = closed, { listing: null } = adding, { listing: null, suggestion } = adding
+  // from a member's suggestion, { listing } = editing it.
   const [form, setForm] = useState(null)
+  // Member suggestion form open or closed.
+  const [suggesting, setSuggesting] = useState(false)
+  // message is { text, isError } or null: a thank-you after suggesting, or a cleanup warning.
+  const [message, setMessage] = useState(null)
 
   // ---------- Load listings ----------
   useEffect(() => {
@@ -92,7 +101,7 @@ export default function Internships({ isEditor }) {
         .order('id', { ascending: true }), 'id', () => cancelled)
 
       if (cancelled) return
-      if (error) setErrorMessage(error.message)
+      if (error) setErrorMessage(friendlyError(error))
       else setListings(data)
       setLoading(false)
     }
@@ -120,9 +129,30 @@ export default function Internships({ isEditor }) {
   const today = easternToday()
 
   // ---------- Event handlers ----------
-  function handleSaved() {
+  // Adding a listing from a suggestion finishes that suggestion, so it's deleted next. The listing
+  // is already saved either way; a failed delete just leaves the suggestion to dismiss by hand.
+  async function handleSaved() {
+    const suggestion = form?.suggestion
     setForm(null)
+    setMessage(null)
+    if (suggestion) {
+      const { error } = await supabase.from('internship_suggestion').delete().eq('id', suggestion.id).select('id').single()
+      if (error) {
+        setMessage({ text: `Listing added, but its suggestion could not be removed: ${friendlyError(error)} Dismiss it below.`, isError: true })
+      }
+    }
     setRefresh((value) => value + 1)
+  }
+
+  function handleSuggested() {
+    setSuggesting(false)
+    setMessage({ text: 'Thanks! Editors will review your suggestion.', isError: false })
+  }
+
+  // Opens the add form, blank or prefilled from a suggestion.
+  function openAddForm(suggestion) {
+    setForm({ listing: null, suggestion })
+    setMessage(null)
   }
 
   // ---------- Render ----------
@@ -132,19 +162,36 @@ export default function Internships({ isEditor }) {
       <div className="section-head">
         <h2 id="internships-heading">Internships</h2>
         <div className="actions">
-          {isEditor && <button type="button" onClick={() => setForm({ listing: null })}>Add listing</button>}
+          {isEditor ? (
+            <button type="button" onClick={() => openAddForm(null)}>Add listing</button>
+          ) : (
+            <button type="button" onClick={() => { setSuggesting(true); setMessage(null) }}>Suggest an internship</button>
+          )}
           <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>
             Refresh listings
           </button>
         </div>
       </div>
 
-      {/* ----- Add form ----- */}
+      {/* ----- Add form. A new key per suggestion restarts the form with that suggestion's values. ----- */}
       {form && !form.listing && (
         <div className="panel">
-          <InternshipForm listing={null} onClose={() => setForm(null)} onSaved={handleSaved} />
+          <InternshipForm key={form.suggestion?.id ?? 'blank'} listing={null} suggestion={form.suggestion}
+            onClose={() => setForm(null)} onSaved={handleSaved} />
         </div>
       )}
+
+      {/* ----- Member suggestion form ----- */}
+      {suggesting && (
+        <div className="panel">
+          <SuggestionForm onClose={() => setSuggesting(false)} onSaved={handleSuggested} />
+        </div>
+      )}
+
+      {message && <p role={message.isError ? 'alert' : 'status'}>{message.text}</p>}
+
+      {/* ----- Editor review of suggestions; refreshing the listings reloads it too ----- */}
+      {isEditor && <Suggestions key={refresh} onAdd={openAddForm} />}
 
       {/* ----- Filters ----- */}
       <div className="filters">

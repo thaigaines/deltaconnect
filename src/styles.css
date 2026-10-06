@@ -148,9 +148,11 @@ button:disabled { opacity: 0.6; cursor: wait; }
   background: var(--surface);
 }
 .panel { margin-bottom: 1rem; }
+.panel-heading { margin: 0; font-size: 1.25rem; } /* e.g. the editors' suggestions list */
 .login-card { max-width: 26rem; }
 .login-card h2 { margin: 0 0 0.5rem; font-size: 1.375rem; }
 .login-card p { margin: 0; color: var(--muted); }
+.login-card [role="alert"] { color: #ff9fae; } /* keeps form errors red inside the card */
 .login-card form { margin-top: 1.5rem; gap: 1rem; }
 
 /* Add/edit listing form (inside .panel when adding, inside the card when editing)
@@ -210,6 +212,7 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 /* The link covers the preview (inset: 0). Its focus ring sits inside so overflow doesn't clip it. */
 .resume-preview a { position: absolute; inset: 0; }
 .resume-preview a:focus-visible { outline-offset: -3px; }
+.resume-card > a { align-self: flex-start; } /* LinkedIn link: only as wide as its text */
 .card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid var(--line); } /* margin-top: auto pins the footer to the card bottom */
 /* Apply link styled as a purple pill, matching the button shape. */
 .apply {
@@ -245,6 +248,8 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 .forum-post { display: grid; gap: 0.5rem; overflow-wrap: anywhere; }
 .forum-post h2 { margin: 0; }
 .forum-body { white-space: pre-wrap; } /* keeps the line breaks the author typed */
+/* Grid items stretch to full width by default; chips and links stay as wide as their text. */
+.forum-list > li > :is(a, .chip), .forum-post > .chip { justify-self: start; }
 
 /* ============================================================
    Chips: small labels for deadlines and editor status

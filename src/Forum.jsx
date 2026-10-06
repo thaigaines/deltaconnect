@@ -1,8 +1,9 @@
-// Forum page (members only): every post, newest first, plus a form to start one.
+// Forum page (members only): every post, pinned first then newest, plus a form to start one.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { loadRows } from './loadRows.js'
 import ForumForm from './ForumForm.jsx'
+import { friendlyError } from './errors.js'
 
 // ---------- Helpers ----------
 // Shared with ForumPost.jsx. A post or comment row with its author's profile ->
@@ -31,15 +32,16 @@ export default function Forum() {
       setLoading(true)
       setErrorMessage('')
 
-      // Each post with its author's name. Newest first; id breaks ties.
+      // Each post with its author's name. Pinned first, then newest; id breaks ties.
       const { data, error } = await loadRows((options) => supabase
         .from('forum_post')
-        .select('id,title,created_at,edited_at,profile(first_name,last_name)', options)
+        .select('id,title,created_at,edited_at,is_pinned,profile(first_name,last_name)', options)
+        .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
         .order('id'), 'id', () => cancelled)
 
       if (cancelled) return
-      if (error) setErrorMessage(error.message)
+      if (error) setErrorMessage(friendlyError(error))
       else setPosts(data)
       setLoading(false)
     }
@@ -85,6 +87,7 @@ export default function Forum() {
           {posts.map((post) => (
             <li key={post.id}>
               {/* The title links to the post's own page. */}
+              {post.is_pinned && <span className="chip">Pinned</span>}
               <h3><a href={`#/forum/${post.id}`}>{post.title}</a></h3>
               <p className="meta">{byline(post)}</p>
             </li>

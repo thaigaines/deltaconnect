@@ -2,13 +2,15 @@
 
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
 Approved members log in to an account home page (`#/`) where they set their
-profile (name and major) and upload or replace their resume. They browse
-internships at `#/internships` with search and filters; editors also add listings
-(with locations), edit listing details, and archive or restore listings. Members
-post topics and comment at `#/forum` (each post at `#/forum/<id>`); moderators can
-remove any post or comment. The resume directory at `#/resumes` is public and
-searchable by name or major. The UI does not yet edit locations after creation or
-delete resumes.
+profile (name, major, graduation term and year, optional LinkedIn) and upload,
+replace, or delete their resume. New members set their first password, and anyone
+can reset a forgotten one, through an emailed link. Members browse internships at
+`#/internships` with search and filters and can suggest internships; editors also
+review suggestions, add listings (with locations), edit listing details, and archive
+or restore listings. Members post topics and comment at `#/forum` (each post at
+`#/forum/<id>`); moderators can remove any post or comment and pin posts to the top.
+The resume directory at `#/resumes` is public and searchable by name or major. The UI
+does not yet edit locations after creation.
 
 This README defines the product and database rules. The SQL migrations in
 `supabase/migrations/` implement the database and are the source for column details.
@@ -40,20 +42,25 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 | --- | --- | --- |
 | `public.internship` | Listing content, optional deadline, archive status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
-| `public.profile` | One per user, created on first save; name and major. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
+| `public.profile` | One per user, created on first save; name, major, graduation term/year, optional LinkedIn URL. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
 | `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |
-| `public.forum_post` | Title, body, creation time, and `edited_at` (set when the text changes) | `user_id` → `profile.user_id`; cascading deletion |
+| `public.forum_post` | Title, body, creation time, `edited_at` (set when the text changes), and `is_pinned` | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_comment` | Body, creation time, and `edited_at`; a flat list under one post | `forum_post_id` → `forum_post.id`, `user_id` → `profile.user_id`; cascading deletion |
+| `public.internship_suggestion` | A member's internship lead (title, company, URL, optional note) for editors to review | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
 | `private.approved_moderator` | Moderators, who must also be editors | `user_id` → `approved_editor.user_id`; cascading deletion |
+
+Graduation term and year are set together; the form requires them, but profiles
+saved before they existed may lack both until the member saves again. LinkedIn URLs
+are `linkedin.com/in/` profile links.
 
 Zero location rows means no city/state was specified. Use consistent city
 spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Access
 
-RLS is enabled on all nine tables.
+RLS is enabled on all ten tables.
 
 Only owner-allowed accounts are intended to log in for internship access. Provision
 each account with an `approved_member` row before its first login, and disable
@@ -74,6 +81,8 @@ Ordinary clients use these permissions:
 | Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
 | Profiles | Visitors: profiles with a resume. Members: all profiles. Owners: their own | Approved members create and edit only their own row |
 | Forum posts and comments | Members only | Members create, edit, and delete their own (a profile is required); moderators delete any. Edits set `edited_at` |
+| Forum pinning | Members (part of each post) | Moderators only, through `set_forum_post_pinned()`; pinned posts list first |
+| Internship suggestions | Editors only | Members create their own; editors delete (dismiss), including after adding the listing |
 | Resume metadata | Everyone | Approved members manage only their own row |
 | Approval tables | No ordinary client access | Privileged administrator only |
 
@@ -89,7 +98,9 @@ initial locations atomically and runs with the caller's permissions (Supabase
 advises against `security definer` functions in exposed schemas). Duplicate URLs
 require an explicit `p_allow_duplicate = true` override; duplicate matches include
 hidden rows.
-Audit fields cannot be changed through ordinary client writes.
+Audit fields cannot be changed through ordinary client writes. `set_forum_post_pinned()`
+runs with the caller's permissions and calls a `security definer` function in `private`,
+which checks moderator approval; `is_pinned` is otherwise not client-writable.
 
 ## Listing presentation
 
@@ -107,11 +118,13 @@ Audit fields cannot be changed through ordinary client writes.
 | File and metadata path | `<user-id>/<random-id>.pdf` |
 
 Approved members can upload, inspect, and delete only PDFs in their own folder.
-Upload first, then save metadata. Replacing a resume uploads to a new path, saves
+Upload first, then save metadata. Deleting a resume removes the file first, then the
+row, so a failure leaves a row the member can delete again. Replacing a resume uploads to a new path, saves
 the metadata, then removes the old file; Supabase advises against overwriting
 because its CDN can serve stale copies. File and database writes are separate:
 handle failures and cleanup in code. Metadata/account deletion does not remove
 Storage files. Revoking membership does not unpublish existing resumes.
+Deleted public files may remain available from CDN or browser caches temporarily.
 
 **Anyone with the public URL can download a resume.** The owner's UUID is visible
 in `object_path` and `user_id`.
@@ -128,8 +141,19 @@ To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
 `supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
 accounts), then run the migrations again and re-approve accounts.
 
-Then configure Auth callback URLs/SMTP, keep `private` outside the Data API, and
-expose the public tables/functions using the explicit grants. Approve existing Auth
+Then configure Auth, keep `private` outside the Data API, and expose the public
+tables/functions using the explicit grants:
+
+- Authentication → URL Configuration: Site URL `https://deltaconnect.vercel.app`.
+- Authentication → Emails: set up custom SMTP. Supabase's built-in sender only
+  emails project team members and is tightly rate-limited.
+- Email templates: point the links at the site so the app verifies them. Scanners
+  that only fetch HTML cannot consume the token; scanners that run JavaScript can:
+  - Invite user: `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=invite`
+  - Reset password: `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=recovery`
+
+Provision members with Invite user (they choose a password from the email) or by
+creating the user and telling them to use "New member or forgot password?". Approve existing Auth
 UUIDs as members, then editors, then moderators, using an administrator session. `supabase/seed.sql`
 optionally adds fictional listings after setting `app.seed_editor_id` to an approved
 test editor UUID in the same SQL session. No credentials or real user data are seeded.

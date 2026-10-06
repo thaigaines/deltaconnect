@@ -7,7 +7,9 @@ import Forum from './Forum.jsx'
 import ForumPost from './ForumPost.jsx'
 import Home from './Home.jsx'
 import Internships from './Internships.jsx'
+import PasswordForm from './PasswordForm.jsx'
 import Resumes from './Resumes.jsx'
+import { friendlyError } from './errors.js'
 
 // ---------- Helpers ----------
 // How to get an account; shown on the login card and to accounts without access.
@@ -27,12 +29,18 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  // resetting shows the "email me a link" form instead of the login form.
+  // notice is a non-error message, such as "check your email".
+  const [resetting, setResetting] = useState(false)
+  const [notice, setNotice] = useState('')
+  // True after an invite or reset link signs the member in, until they save a password.
+  const [settingPassword, setSettingPassword] = useState(false)
 
   // session is null when signed out. loadingSession stops the login form flashing on reload.
   const [session, setSession] = useState(null)
   const [loadingSession, setLoadingSession] = useState(true)
 
-  // permissions is { is_member, is_editor }, or null while checking.
+  // permissions is { is_member, is_editor, is_moderator }, or null while checking.
   // Bumping accessCheck reruns the permissions check.
   const [permissions, setPermissions] = useState(null)
   const [permissionsError, setPermissionsError] = useState('')
@@ -56,8 +64,33 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
       setLoadingSession(false)
+      // Signing out (here or in another tab) abandons an unfinished password setup.
+      if (!currentSession) setSettingPassword(false)
     })
     return () => data.subscription.unsubscribe()
+  }, [])
+
+  // Invite and password-reset emails link to '/?token_hash=...&type=invite' (or type=recovery);
+  // see README. Verifying the one-time token signs the member in, then they choose a password.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tokenHash = params.get('token_hash')
+    const type = params.get('type')
+    if (!tokenHash || (type !== 'invite' && type !== 'recovery')) return
+    // Remove the token from the address first, so a reload, or StrictMode running this effect
+    // twice in development, can't try the already-used token again.
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+
+    async function verifyEmailLink() {
+      // getSession waits until Supabase finishes restoring any saved session, so that
+      // restore can't replace the new one.
+      await supabase.auth.getSession()
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+      if (error) setErrorMessage(friendlyError(error))
+      else setSettingPassword(true)
+    }
+
+    verifyEmailLink()
   }, [])
 
   // Effects depend on the id, not the session, so re-checking the same user changes nothing.
@@ -82,7 +115,7 @@ export default function App() {
       // .single() returns one row instead of a list.
       const { data, error } = await supabase.rpc('my_permissions').single()
       if (cancelled) return
-      if (error) setPermissionsError(error.message)
+      if (error) setPermissionsError(friendlyError(error))
       else setPermissions(data)
     }
 
@@ -107,20 +140,50 @@ export default function App() {
   async function handleLogin(event) {
     event.preventDefault()
     setErrorMessage('')
+    setNotice('')
     setBusy(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
-    if (error) setErrorMessage(error.message)
+    if (error) setErrorMessage(friendlyError(error))
     else setPassword('')
+  }
+
+  // Emails a link for choosing a password. The link's address comes from the Reset Password
+  // email template in Supabase (see README). Supabase doesn't reveal whether the account exists.
+  async function handleResetRequest(event) {
+    event.preventDefault()
+    setErrorMessage('')
+    setNotice('')
+    setBusy(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim())
+    setBusy(false)
+    if (error) setErrorMessage(friendlyError(error))
+    else {
+      setResetting(false)
+      setNotice('If that email has a DeltaConnect account, a link to set your password is on its way. Check your spam folder too.')
+    }
+  }
+
+  // Switches between the login and reset forms, clearing the other form's messages.
+  function toggleResetting() {
+    setResetting((value) => !value)
+    setErrorMessage('')
+    setNotice('')
+  }
+
+  function handlePasswordSaved() {
+    setSettingPassword(false)
+    setNotice('Password saved. Use it the next time you log in.')
   }
 
   // Signs out this device only.
   async function handleSignOut() {
     setErrorMessage('')
+    setNotice('')
     setBusy(true)
     const { error } = await supabase.auth.signOut({ scope: 'local' })
     setBusy(false)
-    if (error) setErrorMessage(error.message)
+    if (error) setErrorMessage(friendlyError(error))
   }
 
   // ---------- Render ----------
@@ -166,7 +229,9 @@ export default function App() {
 
       {/* ----- Main content: the first matching screen wins ----- */}
       <main className="container">
-        {isResumesPage ? (
+        {session && settingPassword ? (
+          <PasswordForm onDone={handlePasswordSaved} />
+        ) : isResumesPage ? (
           <Resumes />
         ) : loadingSession ? (
           <p role="status">Checking login...</p>
@@ -188,25 +253,39 @@ export default function App() {
           )
         ) : (
           <section className="login-card" aria-labelledby="login-heading">
-            <h2 id="login-heading">Member login</h2>
-            <p>{accessContact}</p>
-            <form onSubmit={handleLogin}>
-              <label>
-                Email
-                <input type="email" autoComplete="username" required value={email}
-                  onChange={(event) => setEmail(event.target.value)} />
-              </label>
-              <label>
-                Password
-                <input type="password" autoComplete="current-password" required value={password}
-                  onChange={(event) => setPassword(event.target.value)} />
-              </label>
-              <button type="submit" disabled={busy}>{busy ? 'Logging in...' : 'Log in'}</button>
-            </form>
+            <h2 id="login-heading">{resetting ? 'Set or reset your password' : 'Member login'}</h2>
+            <p>{resetting ? 'New member, or forgot your password? We\'ll email you a link to choose one.' : accessContact}</p>
+            {resetting ? (
+              <form onSubmit={handleResetRequest}>
+                <label>
+                  Email
+                  <input type="email" autoComplete="username" required value={email}
+                    onChange={(event) => setEmail(event.target.value)} />
+                </label>
+                <button type="submit" disabled={busy}>{busy ? 'Sending...' : 'Email me a link'}</button>
+                <button type="button" onClick={toggleResetting}>Back to login</button>
+              </form>
+            ) : (
+              <form onSubmit={handleLogin}>
+                <label>
+                  Email
+                  <input type="email" autoComplete="username" required value={email}
+                    onChange={(event) => setEmail(event.target.value)} />
+                </label>
+                <label>
+                  Password
+                  <input type="password" autoComplete="current-password" required value={password}
+                    onChange={(event) => setPassword(event.target.value)} />
+                </label>
+                <button type="submit" disabled={busy}>{busy ? 'Logging in...' : 'Log in'}</button>
+                <button type="button" onClick={toggleResetting}>New member or forgot password?</button>
+              </form>
+            )}
           </section>
         )}
 
-        {/* Login and sign-out errors. */}
+        {/* Login, password, and sign-out messages. */}
+        {notice && <p role="status">{notice}</p>}
         {errorMessage && <p role="alert">{errorMessage}</p>}
       </main>
     </>

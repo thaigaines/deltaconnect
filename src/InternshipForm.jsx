@@ -1,6 +1,7 @@
 // Editor form to add a listing (no listing prop) or edit one. RLS still decides if a save is allowed.
 import { useState } from 'react'
 import { supabase } from './supabase.js'
+import { friendlyError } from './errors.js'
 
 // ---------- Helpers ----------
 
@@ -42,16 +43,16 @@ async function createListing(fields, locations, allowDuplicate) {
 }
 
 // ---------- Component ----------
-// listing: the listing to edit, or null to add one.
-// onClose: Cancel clicked. onSaved: saved, so the list can reload.
-export default function InternshipForm({ listing, onClose, onSaved }) {
+// listing: the listing to edit, or null to add one. suggestion: a member's suggestion that
+// prefills a new listing (optional). onClose: Cancel clicked. onSaved: saved, so the list can reload.
+export default function InternshipForm({ listing, suggestion, onClose, onSaved }) {
   const isNew = !listing
 
   // ---------- State ----------
-  // Start from the listing's values, or blanks when adding (?. and ?? handle a null listing).
-  const [title, setTitle] = useState(listing?.title ?? '')
-  const [company, setCompany] = useState(listing?.company ?? '')
-  const [url, setUrl] = useState(listing?.application_url ?? '')
+  // Start from the listing's values, a suggestion's, or blanks (?. and ?? handle the missing ones).
+  const [title, setTitle] = useState(listing?.title ?? suggestion?.title ?? '')
+  const [company, setCompany] = useState(listing?.company ?? suggestion?.company ?? '')
+  const [url, setUrl] = useState(listing?.application_url ?? suggestion?.application_url ?? '')
   const [workArrangement, setWorkArrangement] = useState(listing?.work_arrangement ?? 'in-person')
   const [deadline, setDeadline] = useState(listing?.deadline ?? '')
   const [locations, setLocations] = useState('') // adding only
@@ -107,7 +108,7 @@ export default function InternshipForm({ listing, onClose, onSaved }) {
     }
     setBusy(false)
 
-    if (error) setErrorMessage(error.message)
+    if (error) setErrorMessage(friendlyError(error))
     else onSaved()
   }
 

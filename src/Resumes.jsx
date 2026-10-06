@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { supabase, resumeBucket } from './supabase.js'
 import { loadRows } from './loadRows.js'
+import { friendlyError } from './errors.js'
+import { graduationLabel } from './ProfileForm.jsx'
 
 // ---------- Component ----------
 export default function Resumes() {
@@ -23,15 +25,15 @@ export default function Resumes() {
       setLoading(true)
       setErrorMessage('')
 
-      // Each resume with its owner's profile (name and major). Newest first; object_path breaks ties.
+      // Each resume with its owner's profile. Newest first; object_path breaks ties.
       const { data, error } = await loadRows((options) => supabase
         .from('resume')
-        .select('object_path,profile(first_name,last_name,major)', options)
+        .select('object_path,profile(first_name,last_name,major,graduation_term,graduation_year,linkedin_url)', options)
         .order('uploaded_at', { ascending: false })
         .order('object_path'), 'object_path', () => cancelled)
 
       if (cancelled) return
-      if (error) setErrorMessage(error.message)
+      if (error) setErrorMessage(friendlyError(error))
       else setResumes(data)
       setLoading(false)
     }
@@ -79,6 +81,7 @@ export default function Resumes() {
             // Builds the URL only; nothing is downloaded here.
             const { data } = supabase.storage.from(resumeBucket).getPublicUrl(resume.object_path)
             const name = `${resume.profile.first_name} ${resume.profile.last_name}`
+            const graduation = graduationLabel(resume.profile)
             return (
               <li key={resume.object_path} className="resume-card">
                 {/* Browser PDF preview (#settings: fit page, no toolbar), skipped by Tab and screen readers.
@@ -88,7 +91,10 @@ export default function Resumes() {
                   <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${name}'s resume (PDF)`} />
                 </div>
                 <h3>{name}</h3>
-                <p className="meta">{resume.profile.major}</p>
+                <p className="meta">{resume.profile.major}{graduation && ` · ${graduation}`}</p>
+                {resume.profile.linkedin_url && (
+                  <a href={resume.profile.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                )}
               </li>
             )
           })}

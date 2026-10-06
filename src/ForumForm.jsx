@@ -2,6 +2,7 @@
 // RLS still decides if a save is allowed.
 import { useState } from 'react'
 import { supabase } from './supabase.js'
+import { friendlyError } from './errors.js'
 
 // ---------- Component ----------
 // table: 'forum_post' or 'forum_comment'. Posts have a title; comments don't.
@@ -37,7 +38,7 @@ export default function ForumForm({ table, item, newFields, onSaved, onCancel })
 
     // 23503: the author has no profile row for user_id to point to.
     if (error?.code === '23503') setErrorMessage('Save your profile on the home page before posting.')
-    else if (error) setErrorMessage(error.message)
+    else if (error) setErrorMessage(friendlyError(error))
     else {
       // Clear a new comment's box; edit forms and new posts close instead.
       setBody('')

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import ProfileForm from './ProfileForm.jsx'
 import ResumeForm from './ResumeForm.jsx'
+import { friendlyError } from './errors.js'
 
 // ---------- Component ----------
 // userId: the signed-in member's id.
@@ -30,12 +31,12 @@ export default function Home({ userId }) {
       // maybeSingle returns null instead of an error when the profile doesn't exist yet.
       const { data, error } = await supabase
         .from('profile')
-        .select('first_name,last_name,major,resume(object_path,original_filename)')
+        .select('first_name,last_name,major,graduation_term,graduation_year,linkedin_url,resume(object_path,original_filename)')
         .eq('user_id', userId)
         .maybeSingle()
 
       if (cancelled) return
-      if (error) setErrorMessage(error.message)
+      if (error) setErrorMessage(friendlyError(error))
       else setProfile(data)
       setLoading(false)
     }

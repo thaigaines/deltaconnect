@@ -13,7 +13,8 @@ DROP POLICY IF EXISTS upload_resume_file ON storage.objects;
 DROP POLICY IF EXISTS inspect_resume_file ON storage.objects;
 DROP POLICY IF EXISTS delete_resume_file ON storage.objects;
 -- Dropping the tables also drops their policies and triggers; CASCADE drops private's tables and functions.
-DROP TABLE IF EXISTS public.forum_comment, public.forum_post, public.resume, public.profile,
-  public.internship_location, public.internship;
-DROP FUNCTION IF EXISTS public.create_listing(text,text,text,text,date,jsonb,boolean), public.my_permissions();
+DROP TABLE IF EXISTS public.internship_suggestion, public.forum_comment, public.forum_post, public.resume,
+  public.profile, public.internship_location, public.internship;
+DROP FUNCTION IF EXISTS public.create_listing(text,text,text,text,date,jsonb,boolean), public.my_permissions(),
+  public.set_forum_post_pinned(uuid,boolean);
 DROP SCHEMA IF EXISTS private CASCADE;
