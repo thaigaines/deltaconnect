@@ -1,12 +1,12 @@
 // Top-level component: layout, navigation, login, and access checks.
 // Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx),
-// internships (Listings.jsx), or forum (Forum.jsx, ForumPost.jsx).
+// internships (Internships.jsx), or forum (Forum.jsx, ForumPost.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Forum from './Forum.jsx'
 import ForumPost from './ForumPost.jsx'
 import Home from './Home.jsx'
-import Listings from './Listings.jsx'
+import Internships from './Internships.jsx'
 import Resumes from './Resumes.jsx'
 
 // ---------- Helpers ----------
@@ -93,7 +93,7 @@ export default function App() {
   // The members-only page for this address. A new key (other account, access refresh, or post)
   // replaces it with a fresh copy that reloads its data.
   const memberKey = `${userId}:${accessCheck}`
-  const memberPage = isInternshipsPage ? <Listings key={memberKey} isEditor={permissions?.is_editor} />
+  const memberPage = isInternshipsPage ? <Internships key={memberKey} isEditor={permissions?.is_editor} />
     : forumPostId ? <ForumPost key={`${memberKey}:${forumPostId}`} postId={forumPostId} userId={userId} isModerator={permissions?.is_moderator} />
     : isForumPage ? <Forum key={memberKey} />
     : <Home key={memberKey} userId={userId} />

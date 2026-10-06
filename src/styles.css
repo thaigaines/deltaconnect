@@ -259,7 +259,7 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
   font-weight: 500;
   white-space: nowrap;
 }
-/* Added by Listings.jsx when a deadline is within 7 days. */
+/* Added by Internships.jsx when a deadline is within 7 days. */
 .chip.urgent { color: var(--purple); background: var(--purple-soft); border-color: var(--purple-line); }
 
 /* ============================================================

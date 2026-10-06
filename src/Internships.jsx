@@ -2,7 +2,7 @@
 // RLS decides which rows come back: members get active listings, editors get all of them.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import ListingForm from './ListingForm.jsx'
+import InternshipForm from './InternshipForm.jsx'
 import { loadRows } from './loadRows.js'
 
 // ---------- Helpers ----------
@@ -59,7 +59,7 @@ function deadlineLabel(deadline) {
 
 // ---------- Component ----------
 // isEditor: editors can add and edit listings and see status chips.
-export default function Listings({ isEditor }) {
+export default function Internships({ isEditor }) {
   // ---------- State ----------
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -142,7 +142,7 @@ export default function Listings({ isEditor }) {
       {/* ----- Add form ----- */}
       {form && !form.listing && (
         <div className="panel">
-          <ListingForm listing={null} onClose={() => setForm(null)} onSaved={handleSaved} />
+          <InternshipForm listing={null} onClose={() => setForm(null)} onSaved={handleSaved} />
         </div>
       )}
 
@@ -189,7 +189,7 @@ export default function Listings({ isEditor }) {
             if (form?.listing?.id === listing.id) {
               return (
                 <li key={listing.id}>
-                  <ListingForm listing={listing} onClose={() => setForm(null)} onSaved={handleSaved} />
+                  <InternshipForm listing={listing} onClose={() => setForm(null)} onSaved={handleSaved} />
                 </li>
               )
             }

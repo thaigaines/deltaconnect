@@ -44,7 +44,7 @@ async function createListing(fields, locations, allowDuplicate) {
 // ---------- Component ----------
 // listing: the listing to edit, or null to add one.
 // onClose: Cancel clicked. onSaved: saved, so the list can reload.
-export default function ListingForm({ listing, onClose, onSaved }) {
+export default function InternshipForm({ listing, onClose, onSaved }) {
   const isNew = !listing
 
   // ---------- State ----------
