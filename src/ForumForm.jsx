@@ -31,7 +31,7 @@ export default function ForumForm({ table, item, newFields, onSaved, onCancel })
     // user_id comes from the database default (the signed-in user).
     setBusy(true)
     const { error } = item
-      ? await supabase.from(table).update(fields).eq('id', item.id)
+      ? await supabase.from(table).update(fields).eq('id', item.id).select('id').single()
       : await supabase.from(table).insert({ ...newFields, ...fields })
     setBusy(false)
 

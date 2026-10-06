@@ -4,7 +4,7 @@ import { supabase, resumeBucket } from './supabase.js'
 
 // ---------- Component ----------
 // userId: the member's id. resume: their current row ({ object_path, original_filename }), or null.
-// onSaved: saved, so the home page can reload.
+// onSaved: saved, so the home page can reload and retain any cleanup warning.
 export default function ResumeForm({ userId, resume, onSaved }) {
   // ---------- State ----------
   // The picked File, or null. Browsers don't let code set a file input, so it's read in onChange only.
@@ -32,12 +32,13 @@ export default function ResumeForm({ userId, resume, onSaved }) {
 
     // Upload first, so the row never points to a missing file.
     let { error } = await storage.upload(path, file, { contentType: 'application/pdf' })
+    let warning = ''
 
     // Then save the row (the database stamps uploaded_at).
     if (!error) {
       const fields = { object_path: path, original_filename: filename }
       const result = resume
-        ? await supabase.from('resume').update(fields).eq('user_id', userId)
+        ? await supabase.from('resume').update(fields).eq('user_id', userId).select('object_path').single()
         : await supabase.from('resume').insert({ ...fields, user_id: userId })
       error = result.error
 
@@ -47,14 +48,18 @@ export default function ResumeForm({ userId, resume, onSaved }) {
       if (unused) {
         const cleanup = await storage.remove([unused])
         if (cleanup.error) {
-          error = { message: error ? `${error.message} The uploaded file could not be removed.` : 'Saved, but the old file could not be removed.' }
+          if (error) error = { message: `${error.message} The uploaded file could not be removed.` }
+          else warning = 'Resume saved, but the old file could not be removed.'
         }
       }
     }
-    setBusy(false)
-
-    if (error) setErrorMessage(error.message)
-    else onSaved()
+    if (error) {
+      setBusy(false)
+      setErrorMessage(error.message)
+    } else {
+      // Stay disabled until Home reloads the committed path and remounts this form.
+      onSaved(warning)
+    }
   }
 
   // ---------- Render ----------

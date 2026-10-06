@@ -29,7 +29,7 @@ export default function ProfileForm({ userId, profile, onSaved }) {
     // The first save creates the row; later saves update it.
     setBusy(true)
     const { error } = profile
-      ? await supabase.from('profile').update(fields).eq('user_id', userId)
+      ? await supabase.from('profile').update(fields).eq('user_id', userId).select('user_id').single()
       : await supabase.from('profile').insert({ ...fields, user_id: userId })
     setBusy(false)
 

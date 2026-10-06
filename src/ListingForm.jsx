@@ -102,6 +102,7 @@ export default function ListingForm({ listing, onClose, onSaved }) {
         .from('internship')
         .update({ ...fields, is_archived: isArchived })
         .eq('id', listing.id)
+        .select('id').single()
       error = result.error
     }
     setBusy(false)

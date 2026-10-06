@@ -15,6 +15,8 @@ export default function Home({ userId }) {
   const [errorMessage, setErrorMessage] = useState('')
   // Bumping refresh reruns the load effect.
   const [refresh, setRefresh] = useState(0)
+  // Kept here because a new resume path remounts the upload form.
+  const [resumeWarning, setResumeWarning] = useState('')
 
   // ---------- Load the account ----------
   useEffect(() => {
@@ -47,12 +49,19 @@ export default function Home({ userId }) {
     setRefresh((value) => value + 1)
   }
 
+  function handleResumeSaved(warning) {
+    setResumeWarning(warning)
+    reload()
+  }
+
   // ---------- Render ----------
   return (
     <section aria-labelledby="account-heading">
       <div className="section-head">
         <h2 id="account-heading">Your account</h2>
       </div>
+
+      {resumeWarning && <p role="alert">{resumeWarning}</p>}
 
       {loading ? (
         <p role="status">Loading your account...</p>
@@ -69,7 +78,7 @@ export default function Home({ userId }) {
           {/* A resume needs a profile to name it. A new key (new file) resets the form after an upload. */}
           <div className="panel">
             {profile ? (
-              <ResumeForm key={profile.resume?.object_path} userId={userId} resume={profile.resume} onSaved={reload} />
+              <ResumeForm key={profile.resume?.object_path} userId={userId} resume={profile.resume} onSaved={handleResumeSaved} />
             ) : (
               <p className="meta">Save your profile to share a resume.</p>
             )}

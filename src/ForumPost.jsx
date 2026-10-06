@@ -66,7 +66,7 @@ export default function ForumPost({ postId, userId, isModerator }) {
   // Deletes a post (and, through the database, its comments) or one comment.
   async function handleDelete(table, id) {
     if (!window.confirm(table === 'forum_post' ? 'Delete this post and all its comments?' : 'Delete this comment?')) return
-    const { error } = await supabase.from(table).delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id).select('id').single()
     if (error) setErrorMessage(error.message)
     else if (table === 'forum_post') window.location.hash = '#/forum'
     else reload()
