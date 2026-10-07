@@ -1,19 +1,23 @@
 # DeltaConnect
 
 Internship listings and a public resume directory for one Delta Sigma Pi chapter.
-Approved members log in to an account home page (`#/`) where they set their
-profile (name, major, graduation term and year, optional LinkedIn) and upload,
-replace, or delete their resume. New members set their first password, and anyone
-can reset a forgotten one, through an emailed link. Members browse internships at
-`#/internships` with search and filters and can suggest internships; editors also
-review suggestions, add listings (with locations), edit listing details, and archive
-or restore listings. Members post topics and comment at `#/forum` (each post at
-`#/forum/<id>`); moderators can remove any post or comment and pin posts to the top.
-The resume directory at `#/resumes` is public and searchable by name or major. The UI
-does not yet edit locations after creation.
 
-This README defines the product and database rules. The SQL migrations in
-`supabase/migrations/` implement the database and are the source for column details.
+This README describes how the site works and is set up today. It records current
+behavior, not fixed requirements: when a better approach appears or a new need
+conflicts with something here, change the site and update this file to match. The
+SQL migrations in `supabase/migrations/` are the source for column details.
+
+## Pages and member workflow
+
+The owner provisions member accounts. Emailed links let new members choose their
+first password and let users reset forgotten passwords.
+
+| Page | Current behavior |
+| --- | --- |
+| Account home `#/` | Approved members save their name, major, graduation term/year, optional LinkedIn, and upload, replace, or delete their resume |
+| Internships `#/internships` | Members search, filter, and suggest listings. Editors review suggestions, add listings with locations, edit details, and archive or restore listings. The UI does not yet edit locations after creation |
+| Forum `#/forum`, posts `#/forum/<id>` | Members post topics and comments; moderators remove any post or comment and pin posts first |
+| Resume directory `#/resumes` | Public, searchable by name or major; PDF downloads require no login |
 
 ## Run the website
 
@@ -36,7 +40,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 Restart Vite after changing these values. Use the publishable key; service-role
 and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 
-## Tables
+## Data model
 
 | Table | Purpose | Relationship |
 | --- | --- | --- |
@@ -58,9 +62,11 @@ are `linkedin.com/in/` profile links.
 Zero location rows means no city/state was specified. Use consistent city
 spelling and capitalization; state is an uppercase US state/territory code.
 
-## Access
+## Permissions and listing behavior
 
-RLS is enabled on all ten tables.
+RLS is enabled on all ten tables. Keep `private` outside the Data API.
+
+### Account access and roles
 
 Only owner-allowed accounts are intended to log in for internship access. Provision
 each account with an `approved_member` row before its first login, and disable
@@ -92,7 +98,10 @@ still leaves it hidden from regular members. No scheduled deletion is needed.
 
 `my_permissions()` reports the signed-in user's approval. Roles stack: editors must
 first be members, and moderators must first be editors, so removing a role removes
-the roles above it. Moderators can do everything editors can, plus forum moderation. Keep `private` unexposed.
+the roles above it. Moderators can do everything editors can, plus forum moderation.
+
+### Database functions and protected fields
+
 The app creates listings through `create_listing()`, which saves a listing and its
 initial locations atomically and runs with the caller's permissions (Supabase
 advises against `security definer` functions in exposed schemas). Duplicate URLs
@@ -102,7 +111,7 @@ Audit fields cannot be changed through ordinary client writes. `set_forum_post_p
 runs with the caller's permissions and calls a `security definer` function in `private`,
 which checks moderator approval; `is_pinned` is otherwise not client-writable.
 
-## Listing presentation
+### Listing presentation
 
 - Search title, company, and location labels case-insensitively. Location filtering matches any label; work arrangement is separate.
 - Sort by nearest deadline, undated last, with a deterministic tie-breaker. Display missing deadlines as “No deadline provided.”
@@ -119,8 +128,8 @@ which checks moderator approval; `is_pinned` is otherwise not client-writable.
 
 Approved members can upload, inspect, and delete only PDFs in their own folder.
 Upload first, then save metadata. Deleting a resume removes the file first, then the
-row, so a failure leaves a row the member can delete again. Replacing a resume uploads to a new path, saves
-the metadata, then removes the old file; Supabase advises against overwriting
+row, so a failure leaves a row the member can delete again. Replacing a resume
+uploads to a new path, saves the metadata, then removes the old file; Supabase advises against overwriting
 because its CDN can serve stale copies. File and database writes are separate:
 handle failures and cleanup in code. Metadata/account deletion does not remove
 Storage files. Revoking membership does not unpublish existing resumes.
@@ -129,7 +138,9 @@ Deleted public files may remain available from CDN or browser caches temporarily
 **Anyone with the public URL can download a resume.** The owner's UUID is visible
 in `object_path` and `user_id`.
 
-## Set up the database
+## Set up Supabase
+
+### 1. Apply the schema
 
 The SQL scripts in `supabase/migrations/` build the schema when run in filename
 order. Never edit a migration a database has already run; add a new one instead.
@@ -137,23 +148,32 @@ On a fresh Supabase project, run them in the SQL Editor as administrator or appl
 them with the Supabase CLI, using one method per project so migration history
 stays consistent. The first migration stops safely if application tables already exist.
 
-To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
-`supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
-accounts), then run the migrations again and re-approve accounts.
+### 2. Configure Auth and API access
 
 Then configure Auth, keep `private` outside the Data API, and expose the public
 tables/functions using the explicit grants:
 
 - Authentication → URL Configuration: Site URL `https://deltaconnect.vercel.app`.
+- Authentication → Sign In / Providers: turn off new user sign-ups.
 - Authentication → Emails: set up custom SMTP. Supabase's built-in sender only
-  emails project team members and is tightly rate-limited.
+  emails project team members and is tightly rate-limited. A free, dedicated Gmail
+  account works: host `smtp.gmail.com`, port 465, the Gmail address as username and
+  sender, and a Google app password (requires 2-Step Verification).
 - Email templates: point the links at the site so the app verifies them. Scanners
   that only fetch HTML cannot consume the token; scanners that run JavaScript can:
   - Invite user: `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=invite`
   - Reset password: `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=recovery`
 
+### 3. Provision accounts and optional sample data
+
 Provision members with Invite user (they choose a password from the email) or by
-creating the user and telling them to use "New member or forgot password?". Approve existing Auth
-UUIDs as members, then editors, then moderators, using an administrator session. `supabase/seed.sql`
-optionally adds fictional listings after setting `app.seed_editor_id` to an approved
+creating the user and telling them to use "New member or forgot password?". Approve
+existing Auth UUIDs as members, then editors, then moderators, using an administrator
+session. `supabase/seed.sql` optionally adds fictional listings after setting `app.seed_editor_id` to an approved
 test editor UUID in the same SQL session. No credentials or real user data are seeded.
+
+### Reset an existing project
+
+To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
+`supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
+accounts), then run the migrations again and re-approve accounts.
