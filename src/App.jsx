@@ -14,7 +14,7 @@ import { friendlyError } from './errors.js'
 // ---------- Helpers ----------
 // How to get an account; shown on the login card and to accounts without access.
 const accessContact = (
-  <>Access by invitation only. Contact <a href="mailto:thaiagaines@gmail.com">thaiagaines@gmail.com</a> if interested.</>
+  <>Access by invitation only. Contact <a href="mailto:deltaconnectapp@gmail.com">deltaconnectapp@gmail.com</a> if interested.</>
 )
 
 export default function App() {
