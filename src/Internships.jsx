@@ -1,11 +1,9 @@
-// Internships page (members only): loads listings, then search and filters. Members can suggest
-// internships; editors review suggestions and add listings.
+// Internships page (members only): loads listings, then search and filters. Members request
+// internships; editors add listings and review pending requests (edit, publish, or trash).
 // RLS decides which rows come back: members get active listings, editors get all of them.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import InternshipForm from './InternshipForm.jsx'
-import SuggestionForm from './SuggestionForm.jsx'
-import Suggestions from './Suggestions.jsx'
 import { loadRows } from './loadRows.js'
 import { friendlyError } from './errors.js'
 
@@ -62,7 +60,7 @@ function deadlineLabel(deadline) {
 }
 
 // ---------- Component ----------
-// isEditor: editors can add and edit listings, review suggestions, and see status chips.
+// isEditor: editors can add and edit listings, review pending requests, and see status chips.
 export default function Internships({ isEditor }) {
   // ---------- State ----------
   const [listings, setListings] = useState([])
@@ -76,13 +74,12 @@ export default function Internships({ isEditor }) {
   const [location, setLocation] = useState('')
   const [arrangement, setArrangement] = useState('')
 
-  // Editor form: null = closed, { listing: null } = adding, { listing: null, suggestion } = adding
-  // from a member's suggestion, { listing } = editing it.
+  // Form: null = closed, { listing: null } = adding (or requesting), { listing } = editing it.
   const [form, setForm] = useState(null)
-  // Member suggestion form open or closed.
-  const [suggesting, setSuggesting] = useState(false)
-  // message is { text, isError } or null: a thank-you after suggesting, or a cleanup warning.
+  // message is { text, isError } or null: a thank-you after requesting, or a publish/trash error.
   const [message, setMessage] = useState(null)
+  // True while a publish or trash is saving, so its buttons can't be clicked twice.
+  const [busy, setBusy] = useState(false)
 
   // ---------- Load listings ----------
   useEffect(() => {
@@ -96,7 +93,7 @@ export default function Internships({ isEditor }) {
       // Listings with their locations; nearest deadline first, undated last, id breaks ties.
       const { data, error } = await loadRows((options) => supabase
         .from('internship')
-        .select('id,title,company,application_url,work_arrangement,deadline,is_archived,internship_location(city,state)', options)
+        .select('id,title,company,application_url,work_arrangement,deadline,is_archived,is_pending,internship_location(city,state)', options)
         .order('deadline', { ascending: true, nullsFirst: false })
         .order('id', { ascending: true }), 'id', () => cancelled)
 
@@ -113,12 +110,16 @@ export default function Internships({ isEditor }) {
   // ---------- Derived values ----------
   // Recalculated from state on every render, so they don't need useState.
 
+  // Only editors receive pending requests; they're reviewed apart from the filtered list.
+  const pending = listings.filter((listing) => listing.is_pending)
+  const published = listings.filter((listing) => !listing.is_pending)
+
   // Every location label, without duplicates (Set), sorted.
-  const locations = [...new Set(listings.flatMap(locationLabels))].sort()
+  const locations = [...new Set(published.flatMap(locationLabels))].sort()
 
   // Search matches title, company, or a location, ignoring case.
   const query = search.trim().toLowerCase()
-  const visible = listings.filter((listing) => {
+  const visible = published.filter((listing) => {
     const labels = locationLabels(listing)
     return [listing.title, listing.company, ...labels].some((value) => value.toLowerCase().includes(query))
       && (!location || labels.includes(location))
@@ -129,69 +130,118 @@ export default function Internships({ isEditor }) {
   const today = easternToday()
 
   // ---------- Event handlers ----------
-  // Adding a listing from a suggestion finishes that suggestion, so it's deleted next. The listing
-  // is already saved either way; a failed delete just leaves the suggestion to dismiss by hand.
-  async function handleSaved() {
-    const suggestion = form?.suggestion
+  function handleSaved() {
     setForm(null)
-    setMessage(null)
-    if (suggestion) {
-      const { error } = await supabase.from('internship_suggestion').delete().eq('id', suggestion.id).select('id').single()
-      if (error) {
-        setMessage({ text: `Listing added, but its suggestion could not be removed: ${friendlyError(error)} Dismiss it below.`, isError: true })
-      }
-    }
+    // Members' new listings are requests they can't see, so confirm that it was sent.
+    setMessage(isEditor ? null : { text: 'Thanks! Editors will review your request.', isError: false })
     setRefresh((value) => value + 1)
   }
 
-  function handleSuggested() {
-    setSuggesting(false)
-    setMessage({ text: 'Thanks! Editors will review your suggestion.', isError: false })
-  }
-
-  // Opens the add form, blank or prefilled from a suggestion.
-  function openAddForm(suggestion) {
-    setForm({ listing: null, suggestion })
+  function openAddForm() {
+    setForm({ listing: null })
     setMessage(null)
   }
 
+  // Publishing makes a request visible to members.
+  async function handlePublish(listing) {
+    setMessage(null)
+    setBusy(true)
+    const { error } = await supabase.from('internship').update({ is_pending: false }).eq('id', listing.id).select('id').single()
+    setBusy(false)
+    if (error) setMessage({ text: friendlyError(error), isError: true })
+    else setRefresh((value) => value + 1)
+  }
+
+  // Trashing deletes the request and its locations. The database only allows this for pending rows.
+  async function handleTrash(listing) {
+    if (!window.confirm(`Trash the request "${listing.title}" at ${listing.company}?`)) return
+    setMessage(null)
+    setBusy(true)
+    const { error } = await supabase.from('internship').delete().eq('id', listing.id).select('id').single()
+    setBusy(false)
+    if (error) setMessage({ text: friendlyError(error), isError: true })
+    else setRefresh((value) => value + 1)
+  }
+
   // ---------- Render ----------
+  // One card, shared by the pending and published lists. The card being edited shows the form
+  // instead. key matches cards to listings.
+  function renderCard(listing) {
+    if (form?.listing?.id === listing.id) {
+      return (
+        <li key={listing.id}>
+          <InternshipForm listing={listing} isEditor={isEditor} onClose={() => setForm(null)} onSaved={handleSaved} />
+        </li>
+      )
+    }
+
+    // Urgent: closes within the next 7 days.
+    const days = listing.deadline ? daysLeft(listing.deadline, today) : null
+    const urgent = days !== null && days >= 0 && days <= 7
+
+    return (
+      <li key={listing.id}>
+        <div className="card-top">
+          <span className="company">{listing.company}</span>
+          <span className={urgent ? 'chip urgent' : 'chip'}>
+            {urgent ? urgencyLabel(days) : deadlineLabel(listing.deadline)}
+          </span>
+        </div>
+
+        <h3>{listing.title}</h3>
+        <p className="meta">
+          {locationLabels(listing).join(' · ') || 'No city/state provided'} · {listing.work_arrangement}
+        </p>
+
+        <div className="card-footer">
+          <div className="chips">
+            {isEditor && listing.is_archived && <span className="chip">Archived</span>}
+            {/* null < 0 is false, so undated listings never show Expired. */}
+            {isEditor && days < 0 && <span className="chip">Expired</span>}
+          </div>
+          {/* noopener noreferrer stops the new tab from controlling this page. */}
+          <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
+          {isEditor && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
+          {listing.is_pending && (
+            <>
+              <button type="button" disabled={busy} onClick={() => handlePublish(listing)}>Publish</button>
+              <button type="button" disabled={busy} onClick={() => handleTrash(listing)}>Trash</button>
+            </>
+          )}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <section aria-labelledby="internships-heading">
       {/* ----- Heading and actions ----- */}
       <div className="section-head">
         <h2 id="internships-heading">Internships</h2>
         <div className="actions">
-          {isEditor ? (
-            <button type="button" onClick={() => openAddForm(null)}>Add listing</button>
-          ) : (
-            <button type="button" onClick={() => { setSuggesting(true); setMessage(null) }}>Suggest an internship</button>
-          )}
+          <button type="button" onClick={openAddForm}>{isEditor ? 'Add listing' : 'Request an internship'}</button>
           <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>
             Refresh listings
           </button>
         </div>
       </div>
 
-      {/* ----- Add form. A new key per suggestion restarts the form with that suggestion's values. ----- */}
+      {/* ----- Add or request form ----- */}
       {form && !form.listing && (
         <div className="panel">
-          <InternshipForm key={form.suggestion?.id ?? 'blank'} listing={null} suggestion={form.suggestion}
-            onClose={() => setForm(null)} onSaved={handleSaved} />
-        </div>
-      )}
-
-      {/* ----- Member suggestion form ----- */}
-      {suggesting && (
-        <div className="panel">
-          <SuggestionForm onClose={() => setSuggesting(false)} onSaved={handleSuggested} />
+          <InternshipForm listing={null} isEditor={isEditor} onClose={() => setForm(null)} onSaved={handleSaved} />
         </div>
       )}
 
       {message && <p role={message.isError ? 'alert' : 'status'}>{message.text}</p>}
 
-      {/* ----- Editor review of suggestions; refreshing the listings reloads it too ----- */}
-      {isEditor && <Suggestions key={refresh} onAdd={openAddForm} />}
+      {/* ----- Editor review of pending requests; hidden when there are none ----- */}
+      {pending.length > 0 && (
+        <div className="pending">
+          <h3 className="panel-heading">Pending requests ({pending.length})</h3>
+          <ul className="results">{pending.map(renderCard)}</ul>
+        </div>
+      )}
 
       {/* ----- Filters ----- */}
       <div className="filters">
@@ -224,50 +274,9 @@ export default function Internships({ isEditor }) {
       {loading ? <p role="status">Loading internships...</p> : errorMessage ? (
         <p role="alert">Could not load internships: {errorMessage}</p>
       ) : visible.length === 0 ? (
-        <p>{listings.length === 0 ? 'No internships available.' : 'No internships match your filters.'}</p>
+        <p>{published.length === 0 ? 'No internships available.' : 'No internships match your filters.'}</p>
       ) : (
-        <ul className="results">
-          {visible.map((listing) => {
-            // Urgent: closes within the next 7 days.
-            const days = listing.deadline ? daysLeft(listing.deadline, today) : null
-            const urgent = days !== null && days >= 0 && days <= 7
-
-            // The card being edited shows the form instead. key matches cards to listings.
-            if (form?.listing?.id === listing.id) {
-              return (
-                <li key={listing.id}>
-                  <InternshipForm listing={listing} onClose={() => setForm(null)} onSaved={handleSaved} />
-                </li>
-              )
-            }
-            return (
-              <li key={listing.id}>
-                <div className="card-top">
-                  <span className="company">{listing.company}</span>
-                  <span className={urgent ? 'chip urgent' : 'chip'}>
-                    {urgent ? urgencyLabel(days) : deadlineLabel(listing.deadline)}
-                  </span>
-                </div>
-
-                <h3>{listing.title}</h3>
-                <p className="meta">
-                  {locationLabels(listing).join(' · ') || 'No city/state provided'} · {listing.work_arrangement}
-                </p>
-
-                <div className="card-footer">
-                  <div className="chips">
-                    {isEditor && listing.is_archived && <span className="chip">Archived</span>}
-                    {/* null < 0 is false, so undated listings never show Expired. */}
-                    {isEditor && days < 0 && <span className="chip">Expired</span>}
-                  </div>
-                  {/* noopener noreferrer stops the new tab from controlling this page. */}
-                  <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
-                  {isEditor && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <ul className="results">{visible.map(renderCard)}</ul>
       )}
     </section>
   )

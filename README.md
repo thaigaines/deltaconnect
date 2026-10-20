@@ -15,7 +15,7 @@ first password and let users reset forgotten passwords.
 | Page | Current behavior |
 | --- | --- |
 | Account home `#/` | Approved members save their name, major, graduation term/year, optional LinkedIn, and upload, replace, or delete their resume |
-| Internships `#/internships` | Members search, filter, and suggest listings. Editors review suggestions, add listings with locations, edit details, and archive or restore listings. The UI does not yet edit locations after creation |
+| Internships `#/internships` | Members search, filter, and request listings (every field, including locations). Editors add listings directly, edit details and locations, archive or restore listings, and review pending requests: edit, publish, or trash |
 | Forum `#/forum`, posts `#/forum/<id>` | Members post topics and comments; moderators remove any post or comment and pin posts first |
 | Resume directory `#/resumes` | Public, searchable by name or major; PDF downloads require no login |
 
@@ -44,13 +44,12 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 
 | Table | Purpose | Relationship |
 | --- | --- | --- |
-| `public.internship` | Listing content, optional deadline, archive status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
+| `public.internship` | Listing content, optional deadline, archive and pending (member request awaiting review) status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
 | `public.profile` | One per user, created on first save; name, major, graduation term/year, optional LinkedIn URL. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
 | `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_post` | Title, body, creation time, `edited_at` (set when the text changes), and `is_pinned` | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_comment` | Body, creation time, and `edited_at`; a flat list under one post | `forum_post_id` → `forum_post.id`, `user_id` → `profile.user_id`; cascading deletion |
-| `public.internship_suggestion` | A member's internship lead (title, company, URL, optional note) for editors to review | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
 | `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
 | `private.approved_moderator` | Moderators, who must also be editors | `user_id` → `approved_editor.user_id`; cascading deletion |
@@ -64,7 +63,7 @@ spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Permissions and listing behavior
 
-RLS is enabled on all ten tables. Keep `private` outside the Data API.
+RLS is enabled on all nine tables. Keep `private` outside the Data API.
 
 ### Account access and roles
 
@@ -83,16 +82,15 @@ Ordinary clients use these permissions:
 
 | Resource | Read | Write |
 | --- | --- | --- |
-| Internships | Members see active rows; editors see all rows | Editors create and edit content/archive status; no deletion |
+| Internships | Members see active rows (never pending ones, including their own); editors see all rows | Members create pending requests through `create_listing()`. Editors create published listings, edit content/archive status, publish requests, and delete only pending requests |
 | Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
 | Profiles | Visitors: profiles with a resume. Members: all profiles. Owners: their own | Approved members create and edit only their own row |
 | Forum posts and comments | Members only | Members create, edit, and delete their own (a profile is required); moderators delete any. Edits set `edited_at` |
 | Forum pinning | Members (part of each post) | Moderators only, through `set_forum_post_pinned()`; pinned posts list first |
-| Internship suggestions | Editors only | Members create their own; editors delete (dismiss), including after adding the listing |
 | Resume metadata | Everyone | Approved members manage only their own row |
 | Approval tables | No ordinary client access | Privileged administrator only |
 
-Active means not archived and deadline absent or on/after today in
+Active means published (not pending), not archived, and deadline absent or on/after today in
 `America/New_York`. Expiration is calculated on reads; restoring an expired listing
 still leaves it hidden from regular members. No scheduled deletion is needed.
 
@@ -103,10 +101,14 @@ the roles above it. Moderators can do everything editors can, plus forum moderat
 ### Database functions and protected fields
 
 The app creates listings through `create_listing()`, which saves a listing and its
-initial locations atomically and runs with the caller's permissions (Supabase
-advises against `security definer` functions in exposed schemas). Duplicate URLs
-require an explicit `p_allow_duplicate = true` override; duplicate matches include
-hidden rows.
+initial locations atomically: published for editors, pending for other members. It
+runs with the caller's permissions and calls a `security definer` function in
+`private` that checks member approval, because members can't read the pending row
+they insert (Supabase advises against `security definer` functions in exposed
+schemas). Duplicate URLs require an explicit `p_allow_duplicate = true` override;
+duplicate matches include pending and hidden rows. Editors save edits through
+`update_listing()`, which runs with their permissions and replaces the details and
+locations atomically.
 Audit fields cannot be changed through ordinary client writes. `set_forum_post_pinned()`
 runs with the caller's permissions and calls a `security definer` function in `private`,
 which checks moderator approval; `is_pinned` is otherwise not client-writable.
