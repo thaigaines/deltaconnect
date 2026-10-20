@@ -67,12 +67,14 @@ RLS is enabled on all nine tables. Keep `private` outside the Data API.
 
 ### Account access and roles
 
-Only owner-allowed accounts are intended to log in for internship access. Provision
-each account with an `approved_member` row before its first login, and disable
-public self-registration in Supabase Auth. Allowed users browse immediately after
-login; there is no separate membership-approval screen. The existing RLS still
-requires the approval row, so an Auth account alone does not grant database access.
-These hosted settings and approvals must be verified separately.
+Only owner-invited accounts are intended to log in for internship access. A trigger
+on `auth.users` gives every new account an `approved_member` row, so invited users
+browse immediately after setting their password. **This relies on public
+self-registration staying disabled in Supabase Auth**; with it on, anyone who signs
+up becomes a member. RLS still requires the approval row, so deleting it revokes
+membership; the trigger runs only on account creation and never re-approves an
+existing account. Editor and moderator rows are still added by hand. These hosted
+settings and approvals must be verified separately.
 
 The resume directory and PDF downloads belong on a separate public page and
 require no login. Saving a profile and uploading a resume require an approved
@@ -156,7 +158,8 @@ Then configure Auth, keep `private` outside the Data API, and expose the public
 tables/functions using the explicit grants:
 
 - Authentication → URL Configuration: Site URL `https://deltaconnect.vercel.app`.
-- Authentication → Sign In / Providers: turn off new user sign-ups.
+- Authentication → Sign In / Providers: turn off new user sign-ups (required, since
+  every new account becomes a member).
 - Authentication → Emails: set up custom SMTP. Supabase's built-in sender only
   emails project team members and is tightly rate-limited. A free, dedicated Gmail
   account works: host `smtp.gmail.com`, port 465, the Gmail address as username and
@@ -169,13 +172,15 @@ tables/functions using the explicit grants:
 ### 3. Provision accounts and optional sample data
 
 Provision members with Invite user (they choose a password from the email) or by
-creating the user and telling them to use "Forgot password?". Approve
-existing Auth UUIDs as members, then editors, then moderators, using an administrator
-session. `supabase/seed.sql` optionally adds fictional listings after setting `app.seed_editor_id` to an approved
+creating the user and telling them to use "Forgot password?"; either way they become
+members automatically. Approve editors, then moderators, by inserting their Auth
+UUIDs into `private.approved_editor` and `private.approved_moderator` in an
+administrator session. Accounts created before the auto-approval migration, or kept
+through a reset, need their `private.approved_member` row added by hand. `supabase/seed.sql` optionally adds fictional listings after setting `app.seed_editor_id` to an approved
 test editor UUID in the same SQL session. No credentials or real user data are seeded.
 
 ### Reset an existing project
 
 To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
 `supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
-accounts), then run the migrations again and re-approve accounts.
+accounts), then run the migrations again and re-approve the kept accounts by hand.
