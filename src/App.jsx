@@ -254,7 +254,7 @@ export default function App() {
         ) : (
           <section className="login-card" aria-labelledby="login-heading">
             <h2 id="login-heading">{resetting ? 'Set or reset your password' : 'Member login'}</h2>
-            <p>{resetting ? 'New member, or forgot your password? We\'ll email you a link to choose one.' : accessContact}</p>
+            <p>{resetting ? 'Forgot your password? We\'ll email you a link to choose a new one.' : accessContact}</p>
             {resetting ? (
               <form onSubmit={handleResetRequest}>
                 <label>
@@ -278,7 +278,7 @@ export default function App() {
                     onChange={(event) => setPassword(event.target.value)} />
                 </label>
                 <button type="submit" disabled={busy}>{busy ? 'Logging in...' : 'Log in'}</button>
-                <button type="button" onClick={toggleResetting}>New member or forgot password?</button>
+                <button type="button" onClick={toggleResetting}>Forgot password?</button>
               </form>
             )}
           </section>

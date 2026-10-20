@@ -167,7 +167,7 @@ tables/functions using the explicit grants:
 ### 3. Provision accounts and optional sample data
 
 Provision members with Invite user (they choose a password from the email) or by
-creating the user and telling them to use "New member or forgot password?". Approve
+creating the user and telling them to use "Forgot password?". Approve
 existing Auth UUIDs as members, then editors, then moderators, using an administrator
 session. `supabase/seed.sql` optionally adds fictional listings after setting `app.seed_editor_id` to an approved
 test editor UUID in the same SQL session. No credentials or real user data are seeded.
