@@ -199,13 +199,18 @@ export default function Internships({ isEditor }) {
             {/* null < 0 is false, so undated listings never show Expired. */}
             {isEditor && days < 0 && <span className="chip">Expired</span>}
           </div>
-          {/* noopener noreferrer stops the new tab from controlling this page. */}
-          <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
-          {isEditor && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
-          {listing.is_pending && (
-            <>
+          {/* Pending requests get review buttons instead of Apply; .actions keeps them together on the right. */}
+          {listing.is_pending ? (
+            <div className="actions">
+              <button type="button" onClick={() => setForm({ listing })}>Edit</button>
               <button type="button" disabled={busy} onClick={() => handlePublish(listing)}>Publish</button>
               <button type="button" disabled={busy} onClick={() => handleTrash(listing)}>Trash</button>
+            </div>
+          ) : (
+            <>
+              {/* noopener noreferrer stops the new tab from controlling this page. */}
+              <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
+              {isEditor && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
             </>
           )}
         </div>
