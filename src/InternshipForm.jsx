@@ -1,5 +1,5 @@
-// Form to add a listing (no listing prop) or, for editors, edit one. Members' new listings are
-// requests that wait for an editor. RLS and the database functions still decide if a save is allowed.
+// Form to add a listing (no listing prop) or, for moderators, edit one. Members' new listings are
+// requests that wait for a moderator. RLS and the database functions still decide if a save is allowed.
 import { useState } from 'react'
 import { supabase } from './supabase.js'
 import { friendlyError } from './errors.js'
@@ -51,11 +51,11 @@ async function createListing(fields, locations, allowDuplicate) {
 }
 
 // ---------- Component ----------
-// listing: the listing to edit, or null to add one. isEditor: editors publish new listings
+// listing: the listing to edit, or null to add one. isModerator: moderators publish new listings
 // directly; members send them as requests. onClose: Cancel clicked. onSaved: saved, so the list can reload.
-export default function InternshipForm({ listing, isEditor, onClose, onSaved }) {
+export default function InternshipForm({ listing, isModerator, onClose, onSaved }) {
   const isNew = !listing
-  const isRequest = isNew && !isEditor
+  const isRequest = isNew && !isModerator
 
   // ---------- State ----------
   // Start from the listing's values, or blanks when adding (?. and ?? handle the missing listing).
@@ -132,7 +132,7 @@ export default function InternshipForm({ listing, isEditor, onClose, onSaved }) 
   return (
     <form className="listing-form" onSubmit={handleSubmit} aria-label={heading}>
       <h3>{heading}</h3>
-      {isRequest && <p className="meta">Editors review requests before they appear in the list.</p>}
+      {isRequest && <p className="meta">Moderators review requests before they appear in the list.</p>}
       <label>
         Title
         <input required value={title} onChange={(event) => setTitle(event.target.value)} />

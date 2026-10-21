@@ -17,5 +17,6 @@ DROP TABLE IF EXISTS public.forum_comment, public.forum_post, public.resume,
   public.profile, public.internship_location, public.internship;
 DROP FUNCTION IF EXISTS public.create_listing(text,text,text,text,date,jsonb,boolean),
   public.update_listing(uuid,text,text,text,text,date,boolean,jsonb), public.my_permissions(),
-  public.set_forum_post_pinned(uuid,boolean);
+  public.set_forum_post_pinned(uuid,boolean), public.list_members(), public.set_moderator(uuid,boolean);
+-- Also drops the auth.users trigger that approves new members, since its function lives in private.
 DROP SCHEMA IF EXISTS private CASCADE;

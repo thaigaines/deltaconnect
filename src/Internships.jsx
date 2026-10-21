@@ -1,6 +1,6 @@
 // Internships page (members only): loads listings, then search and filters. Members request
-// internships; editors add listings and review pending requests (edit, publish, or trash).
-// RLS decides which rows come back: members get active listings, editors get all of them.
+// internships; moderators add listings and review pending requests (edit, publish, or trash).
+// RLS decides which rows come back: members get active listings, moderators get all of them.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import InternshipForm from './InternshipForm.jsx'
@@ -60,8 +60,8 @@ function deadlineLabel(deadline) {
 }
 
 // ---------- Component ----------
-// isEditor: editors can add and edit listings, review pending requests, and see status chips.
-export default function Internships({ isEditor }) {
+// isModerator: moderators can add and edit listings, review pending requests, and see status chips.
+export default function Internships({ isModerator }) {
   // ---------- State ----------
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -110,7 +110,7 @@ export default function Internships({ isEditor }) {
   // ---------- Derived values ----------
   // Recalculated from state on every render, so they don't need useState.
 
-  // Only editors receive pending requests; they're reviewed apart from the filtered list.
+  // Only moderators receive pending requests; they're reviewed apart from the filtered list.
   const pending = listings.filter((listing) => listing.is_pending)
   const published = listings.filter((listing) => !listing.is_pending)
 
@@ -133,7 +133,7 @@ export default function Internships({ isEditor }) {
   function handleSaved() {
     setForm(null)
     // Members' new listings are requests they can't see, so confirm that it was sent.
-    setMessage(isEditor ? null : { text: 'Thanks! Editors will review your request.', isError: false })
+    setMessage(isModerator ? null : { text: 'Thanks! Moderators will review your request.', isError: false })
     setRefresh((value) => value + 1)
   }
 
@@ -170,7 +170,7 @@ export default function Internships({ isEditor }) {
     if (form?.listing?.id === listing.id) {
       return (
         <li key={listing.id}>
-          <InternshipForm listing={listing} isEditor={isEditor} onClose={() => setForm(null)} onSaved={handleSaved} />
+          <InternshipForm listing={listing} isModerator={isModerator} onClose={() => setForm(null)} onSaved={handleSaved} />
         </li>
       )
     }
@@ -195,9 +195,9 @@ export default function Internships({ isEditor }) {
 
         <div className="card-footer">
           <div className="chips">
-            {isEditor && listing.is_archived && <span className="chip">Archived</span>}
+            {isModerator && listing.is_archived && <span className="chip">Archived</span>}
             {/* null < 0 is false, so undated listings never show Expired. */}
-            {isEditor && days < 0 && <span className="chip">Expired</span>}
+            {isModerator && days < 0 && <span className="chip">Expired</span>}
           </div>
           {/* Pending requests get review buttons instead of Apply; .actions keeps them together on the right. */}
           {listing.is_pending ? (
@@ -210,7 +210,7 @@ export default function Internships({ isEditor }) {
             <>
               {/* noopener noreferrer stops the new tab from controlling this page. */}
               <a className="apply" href={listing.application_url} target="_blank" rel="noopener noreferrer">Apply</a>
-              {isEditor && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
+              {isModerator && <button type="button" onClick={() => setForm({ listing })}>Edit</button>}
             </>
           )}
         </div>
@@ -224,7 +224,7 @@ export default function Internships({ isEditor }) {
       <div className="section-head">
         <h2 id="internships-heading">Internships</h2>
         <div className="actions">
-          <button type="button" onClick={openAddForm}>{isEditor ? 'Add listing' : 'Request an internship'}</button>
+          <button type="button" onClick={openAddForm}>{isModerator ? 'Add listing' : 'Request an internship'}</button>
           <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>
             Refresh listings
           </button>
@@ -234,7 +234,7 @@ export default function Internships({ isEditor }) {
       {/* ----- Add or request form ----- */}
       {form && !form.listing && (
         <div className="panel">
-          <InternshipForm listing={null} isEditor={isEditor} onClose={() => setForm(null)} onSaved={handleSaved} />
+          <InternshipForm listing={null} isModerator={isModerator} onClose={() => setForm(null)} onSaved={handleSaved} />
         </div>
       )}
 

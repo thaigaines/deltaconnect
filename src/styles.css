@@ -147,7 +147,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
   background: var(--surface);
 }
 .panel { margin-bottom: 1rem; }
-.panel-heading { margin: 0; font-size: 1.25rem; } /* e.g. the editors' pending requests */
+.panel-heading { margin: 0; font-size: 1.25rem; } /* e.g. the moderators' pending requests */
 .pending { margin-bottom: 1.75rem; } /* space between pending request cards and the filters */
 .login-card { max-width: 26rem; }
 .login-card h2 { margin: 0 0 0.5rem; font-size: 1.375rem; }
@@ -249,7 +249,7 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 .forum-list > li > :is(a, .chip), .forum-post > .chip { justify-self: start; }
 
 /* ============================================================
-   Chips: small labels for deadlines and editor status
+   Chips: small labels for deadlines, moderator status, and roles
    ============================================================ */
 .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .chip {

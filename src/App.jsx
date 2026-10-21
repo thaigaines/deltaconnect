@@ -1,12 +1,14 @@
 // Top-level component: layout, navigation, login, and access checks.
 // Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx),
-// internships (Internships.jsx), or forum (Forum.jsx, ForumPost.jsx).
+// internships (Internships.jsx), or forum (Forum.jsx, ForumPost.jsx); administrators also get
+// the members page (Members.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Forum from './Forum.jsx'
 import ForumPost from './ForumPost.jsx'
 import Home from './Home.jsx'
 import Internships from './Internships.jsx'
+import Members from './Members.jsx'
 import PasswordForm from './PasswordForm.jsx'
 import Resumes from './Resumes.jsx'
 import { friendlyError } from './errors.js'
@@ -40,7 +42,7 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [loadingSession, setLoadingSession] = useState(true)
 
-  // permissions is { is_member, is_editor, is_moderator }, or null while checking.
+  // permissions is { is_member, is_moderator, is_administrator }, or null while checking.
   // Bumping accessCheck reruns the permissions check.
   const [permissions, setPermissions] = useState(null)
   const [permissionsError, setPermissionsError] = useState('')
@@ -100,9 +102,11 @@ export default function App() {
   const isInternshipsPage = page === '#/internships'
   const forumPostId = page.startsWith('#/forum/') ? page.slice('#/forum/'.length) : null
   const isForumPage = page === '#/forum' || forumPostId !== null
-  const isHomePage = !isResumesPage && !isInternshipsPage && !isForumPage
+  // Only administrators have a members page; for anyone else '#/members' is the home page.
+  const isMembersPage = page === '#/members' && permissions?.is_administrator === true
+  const isHomePage = !isResumesPage && !isInternshipsPage && !isForumPage && !isMembersPage
 
-  // Check member/editor access whenever the user changes or access is refreshed.
+  // Check member access and roles whenever the user changes or access is refreshed.
   // Clearing first means one account never sees another's access.
   useEffect(() => {
     setPermissions(null)
@@ -126,9 +130,10 @@ export default function App() {
   // The members-only page for this address. A new key (other account, access refresh, or post)
   // replaces it with a fresh copy that reloads its data.
   const memberKey = `${userId}:${accessCheck}`
-  const memberPage = isInternshipsPage ? <Internships key={memberKey} isEditor={permissions?.is_editor} />
+  const memberPage = isInternshipsPage ? <Internships key={memberKey} isModerator={permissions?.is_moderator} />
     : forumPostId ? <ForumPost key={`${memberKey}:${forumPostId}`} postId={forumPostId} userId={userId} isModerator={permissions?.is_moderator} />
     : isForumPage ? <Forum key={memberKey} />
+    : isMembersPage ? <Members key={memberKey} />
     : <Home key={memberKey} userId={userId} />
 
   // ---------- Event handlers ----------
@@ -202,6 +207,9 @@ export default function App() {
               <a href="#/internships" aria-current={isInternshipsPage ? 'page' : undefined}>Internships</a>
               <a href="#/forum" aria-current={isForumPage ? 'page' : undefined}>Forum</a>
               <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
+              {permissions?.is_administrator && (
+                <a href="#/members" aria-current={isMembersPage ? 'page' : undefined}>Members</a>
+              )}
             </nav>
           </div>
           {/* a && b shows b only when a is truthy. */}
@@ -222,6 +230,7 @@ export default function App() {
             {isResumesPage ? 'Meet the chapter.'
               : isInternshipsPage ? 'Internships curated by our chapter, for our chapter.'
               : isForumPage ? 'Questions and conversations for our chapter.'
+              : isMembersPage ? 'Chapter accounts and roles.'
               : 'Your chapter account.'}
           </p>
         </div>

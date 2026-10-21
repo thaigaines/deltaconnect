@@ -1,5 +1,6 @@
 -- Fresh Supabase application schema. Existing tables cause a safe failure.
 CREATE SCHEMA IF NOT EXISTS private;
+-- is_pending: a member's request awaiting moderator review; hidden from members, including its author.
 CREATE TABLE public.internship (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL CHECK (title = btrim(title) AND title ~ '[^[:space:]]'),
@@ -8,6 +9,7 @@ CREATE TABLE public.internship (
   work_arrangement text NOT NULL CHECK (work_arrangement IN ('in-person','hybrid','remote')),
   deadline date,
   is_archived boolean NOT NULL DEFAULT false,
+  is_pending boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   created_by uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE RESTRICT
 );
@@ -23,22 +25,29 @@ CREATE TABLE public.internship_location (
   )),
   UNIQUE (internship_id, city, state)
 );
+-- Roles stack: moderators must be members, administrators must be moderators.
 CREATE TABLE private.approved_member (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
 );
-CREATE TABLE private.approved_editor (
+-- Moderators review listing requests, edit listings, and moderate the forum.
+CREATE TABLE private.approved_moderator (
   user_id uuid PRIMARY KEY REFERENCES private.approved_member(user_id) ON DELETE CASCADE
 );
--- Moderators are editors who can also remove any forum post or comment.
-CREATE TABLE private.approved_moderator (
-  user_id uuid PRIMARY KEY REFERENCES private.approved_editor(user_id) ON DELETE CASCADE
+-- Administrators can also grant and remove the moderator role. Added only by hand in SQL.
+CREATE TABLE private.approved_administrator (
+  user_id uuid PRIMARY KEY REFERENCES private.approved_moderator(user_id) ON DELETE CASCADE
 );
 -- One profile per user, created when the member first saves it. New user details become columns here.
+-- Graduation term and year are set together; LinkedIn is an optional linkedin.com/in/ link.
 CREATE TABLE public.profile (
   user_id uuid PRIMARY KEY DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   first_name text NOT NULL CHECK (first_name = btrim(first_name) AND first_name ~ '[^[:space:]]'),
   last_name text NOT NULL CHECK (last_name = btrim(last_name) AND last_name ~ '[^[:space:]]'),
-  major text NOT NULL CHECK (major = btrim(major) AND major ~ '[^[:space:]]')
+  major text NOT NULL CHECK (major = btrim(major) AND major ~ '[^[:space:]]'),
+  graduation_term text CHECK (graduation_term IN ('spring','summer','fall')),
+  graduation_year smallint CHECK (graduation_year BETWEEN 2000 AND 2100),
+  linkedin_url text CHECK (linkedin_url ~* '^https://([a-z]{2,3}\.)?linkedin\.com/in/[^/?#[:space:]]+/?$'),
+  CONSTRAINT profile_graduation_check CHECK ((graduation_term IS NULL) = (graduation_year IS NULL))
 );
 -- At most one resume per profile; a resume cannot exist without a profile to name it.
 CREATE TABLE public.resume (
@@ -56,6 +65,7 @@ CREATE TABLE public.forum_post (
   user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profile(user_id) ON DELETE CASCADE,
   title text NOT NULL CHECK (title = btrim(title) AND title ~ '[^[:space:]]' AND char_length(title) <= 200),
   body text NOT NULL CHECK (body = btrim(body) AND body ~ '[^[:space:]]' AND char_length(body) <= 10000),
+  is_pinned boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   edited_at timestamptz
 );
@@ -80,10 +90,10 @@ ALTER TABLE public.resume ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_post ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_comment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.approved_member ENABLE ROW LEVEL SECURITY;
-ALTER TABLE private.approved_editor ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.approved_moderator ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.approved_administrator ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON private.approved_member, private.approved_editor, private.approved_moderator
+REVOKE ALL ON private.approved_member, private.approved_moderator, private.approved_administrator
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON public.internship, public.internship_location, public.profile, public.resume,
   public.forum_post, public.forum_comment FROM PUBLIC, anon, authenticated;

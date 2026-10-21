@@ -1,21 +1,21 @@
 -- Optional LOCAL development data. No accounts or approvals are created here.
--- Create a test Auth account, approve it as an editor, and run this script in the
--- same SQL session after: SET app.seed_editor_id = '<test-account-uuid>';
+-- Create a test Auth account, approve it as a moderator, and run this script in the
+-- same SQL session after: SET app.seed_moderator_id = '<test-account-uuid>';
 -- Without that setting, seeding is skipped. Never use real resumes in seed data.
 begin;
 do $$
 declare
-    editor_id text := nullif(current_setting('app.seed_editor_id', true), '');
+    moderator_id text := nullif(current_setting('app.seed_moderator_id', true), '');
     old_claims text := current_setting('request.jwt.claims', true);
     old_subject text := current_setting('request.jwt.claim.sub', true);
 begin
-    if editor_id is null then
-        raise notice 'Seed skipped: set app.seed_editor_id to an approved local test editor UUID.';
+    if moderator_id is null then
+        raise notice 'Seed skipped: set app.seed_moderator_id to an approved local test moderator UUID.';
         return;
     end if;
-    -- Temporarily use the test editor's identity so creation exercises the real RPC.
-    perform set_config('request.jwt.claim.sub', editor_id::uuid::text, true);
-    perform set_config('request.jwt.claims', json_build_object('sub', editor_id)::text, true);
+    -- Temporarily use the test moderator's identity so creation exercises the real RPC.
+    perform set_config('request.jwt.claim.sub', moderator_id::uuid::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', moderator_id)::text, true);
 
     perform public.create_listing(
         'Software Engineering Intern', 'Example Company',

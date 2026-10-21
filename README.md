@@ -15,9 +15,10 @@ first password and let users reset forgotten passwords.
 | Page | Current behavior |
 | --- | --- |
 | Account home `#/` | Approved members save their name, major, graduation term/year, optional LinkedIn, and upload, replace, or delete their resume |
-| Internships `#/internships` | Members search, filter, and request listings (every field, including locations). Editors add listings directly, edit details and locations, archive or restore listings, and review pending requests: edit, publish, or trash |
+| Internships `#/internships` | Members search, filter, and request listings (every field, including locations). Moderators add listings directly, edit details and locations, archive or restore listings, and review pending requests: edit, publish, or trash |
 | Forum `#/forum`, posts `#/forum/<id>` | Members post topics and comments; moderators remove any post or comment and pin posts first |
 | Resume directory `#/resumes` | Public, searchable by name or major; PDF downloads require no login |
+| Members `#/members` | Administrators only: every member's email, name (or "No profile"), and role, searchable by email or name; grant or remove the moderator role |
 
 ## Run the website
 
@@ -43,7 +44,7 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 ## Source guide
 
 - `src/App.jsx`: navigation, login, email-link verification, and access checks.
-- `src/Home.jsx`, `src/Internships.jsx`, `src/Forum.jsx`, `src/ForumPost.jsx`, and `src/Resumes.jsx`: page data and presentation; adjacent form components handle writes.
+- `src/Home.jsx`, `src/Internships.jsx`, `src/Forum.jsx`, `src/ForumPost.jsx`, `src/Members.jsx`, and `src/Resumes.jsx`: page data and presentation; adjacent form components handle writes.
 - `src/loadRows.js`: complete, ordered metadata loading for client-side search and lists.
 - `src/errors.js`: shared error messages; callers handle errors specific to their workflow.
 - `src/supabase.js`: shared client and resume bucket name; `src/styles.css`: shared styling.
@@ -60,8 +61,8 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 | `public.forum_post` | Title, body, creation time, `edited_at` (set when the text changes), and `is_pinned` | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_comment` | Body, creation time, and `edited_at`; a flat list under one post | `forum_post_id` → `forum_post.id`, `user_id` → `profile.user_id`; cascading deletion |
 | `private.approved_member` | Approved member accounts | `user_id` → `auth.users.id`; cascading deletion |
-| `private.approved_editor` | Editors, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
-| `private.approved_moderator` | Moderators, who must also be editors | `user_id` → `approved_editor.user_id`; cascading deletion |
+| `private.approved_moderator` | Moderators, who must also be approved members | `user_id` → `approved_member.user_id`; cascading deletion |
+| `private.approved_administrator` | Administrators, who must also be moderators | `user_id` → `approved_moderator.user_id`; cascading deletion |
 
 Graduation term and year are set together; the form requires them, but profiles
 saved before they existed may lack both until the member saves again. LinkedIn URLs
@@ -82,7 +83,8 @@ browse immediately after setting their password. **This relies on public
 self-registration staying disabled in Supabase Auth**; with it on, anyone who signs
 up becomes a member. RLS still requires the approval row, so deleting it revokes
 membership; the trigger runs only on account creation and never re-approves an
-existing account. Editor and moderator rows are still added by hand. These hosted
+existing account. Administrators grant and remove the moderator role on the members
+page; the administrator row is added only by hand in SQL. These hosted
 settings and approvals must be verified separately.
 
 The resume directory and PDF downloads belong on a separate public page and
@@ -93,36 +95,40 @@ Ordinary clients use these permissions:
 
 | Resource | Read | Write |
 | --- | --- | --- |
-| Internships | Members see active rows (never pending ones, including their own); editors see all rows | Members create pending requests through `create_listing()`. Editors create published listings, edit content/archive status, publish requests, and delete only pending requests |
-| Locations | Same visibility as their internship | Editors create, edit city/state, and delete |
+| Internships | Members see active rows (never pending ones, including their own); moderators see all rows | Members create pending requests through `create_listing()`. Moderators create published listings, edit content/archive status, publish requests, and delete only pending requests |
+| Locations | Same visibility as their internship | Moderators create, edit city/state, and delete |
 | Profiles | Visitors: profiles with a resume. Members: all profiles. Owners: their own | Approved members create and edit only their own row |
 | Forum posts and comments | Members only | Members create, edit, and delete their own (a profile is required); moderators delete any. Edits set `edited_at` |
 | Forum pinning | Members (part of each post) | Moderators only, through `set_forum_post_pinned()`; pinned posts list first |
 | Resume metadata | Everyone | Approved members manage only their own row |
-| Approval tables | No ordinary client access | Privileged administrator only |
+| Member list and moderator role | Administrators only, through `list_members()` | Administrators only, through `set_moderator()`; administrators always keep their moderator role |
+| Approval tables | No direct client access | Administrators change the moderator role through `set_moderator()`; all other changes in the SQL Editor |
 
 Active means published (not pending), not archived, and deadline absent or on/after today in
 `America/New_York`. Expiration is calculated on reads; restoring an expired listing
 still leaves it hidden from regular members. No scheduled deletion is needed.
 
-`my_permissions()` reports the signed-in user's approval. Roles stack: editors must
-first be members, and moderators must first be editors, so removing a role removes
-the roles above it. Moderators can do everything editors can, plus forum moderation.
+`my_permissions()` reports the signed-in user's approval. Roles stack: moderators must
+first be members, and administrators must first be moderators, so removing a role removes
+the roles above it. Moderators review listing requests, edit listings, and moderate the
+forum; administrators can also manage moderators.
 
 ### Database functions and protected fields
 
 The app creates listings through `create_listing()`, which saves a listing and its
-initial locations atomically: published for editors, pending for other members. It
+initial locations atomically: published for moderators, pending for other members. It
 runs with the caller's permissions and calls a `security definer` function in
 `private` that checks member approval, because members can't read the pending row
 they insert (Supabase advises against `security definer` functions in exposed
 schemas). On creation, duplicate URLs require an explicit `p_allow_duplicate = true` override;
-duplicate matches include pending and hidden rows. Editors save edits through
+duplicate matches include pending and hidden rows. Moderators save edits through
 `update_listing()`, which runs with their permissions and replaces the details and
 locations atomically; URL edits do not prompt for duplicate confirmation.
 Audit fields cannot be changed through ordinary client writes. `set_forum_post_pinned()`
 runs with the caller's permissions and calls a `security definer` function in `private`,
 which checks moderator approval; `is_pinned` is otherwise not client-writable.
+`list_members()` and `set_moderator()` follow the same pattern and check administrator
+approval, since emails live in `auth.users` and roles in `private`.
 
 ### Listing presentation
 
@@ -157,7 +163,7 @@ in `object_path` and `user_id`.
 
 The SQL scripts in `supabase/migrations/` build the schema when run in filename
 order. Never edit a migration a database has already run; add a new one instead.
-On a fresh Supabase project, run them in the SQL Editor as administrator or apply
+On a fresh Supabase project, run them in the SQL Editor or apply
 them with the Supabase CLI, using one method per project so migration history
 stays consistent. The first migration stops safely if application tables already exist.
 
@@ -182,11 +188,12 @@ tables/functions using the explicit grants:
 
 Provision members with Invite user (they choose a password from the email) or by
 creating the user and telling them to use "Forgot password?"; either way they become
-members automatically. Approve editors, then moderators, by inserting their Auth
-UUIDs into `private.approved_editor` and `private.approved_moderator` in an
-administrator session. Accounts created before the auto-approval migration, or kept
-through a reset, need their `private.approved_member` row added by hand. `supabase/seed.sql` optionally adds fictional listings after setting `app.seed_editor_id` to an approved
-test editor UUID in the same SQL session. No credentials or real user data are seeded.
+members automatically. Make yourself administrator once in the SQL Editor by inserting
+your Auth UUID into `private.approved_moderator`, then `private.approved_administrator`;
+after that, manage moderators on the members page. Accounts kept through a reset need
+their `private.approved_member` row added by hand. `supabase/seed.sql` optionally adds
+fictional listings after setting `app.seed_moderator_id` to an approved test moderator
+UUID in the same SQL session. No credentials or real user data are seeded.
 
 ### Reset an existing project
 
