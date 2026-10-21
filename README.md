@@ -54,7 +54,7 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 
 | Table | Purpose | Relationship |
 | --- | --- | --- |
-| `public.internship` | Listing content, optional deadline, archive and pending (member request awaiting review) status, and creation audit fields | `created_by` → `auth.users.id`; account deletion restricted |
+| `public.internship` | Listing content, optional deadline, archive and pending (member request awaiting review) status, and creation audit fields | `created_by` → `auth.users.id`; set to null when that account is deleted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
 | `public.profile` | One per user, created on first save; name, major, graduation term/year, optional LinkedIn URL. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
 | `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |

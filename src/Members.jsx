@@ -20,6 +20,7 @@ function memberName(member) {
 export default function Members() {
   // ---------- State ----------
   const [members, setMembers] = useState([])
+  // Only the first load shows "Loading", so reloads after a role change keep the list and scroll position.
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   // Bumping refresh reruns the load effect.
@@ -36,8 +37,6 @@ export default function Members() {
     let cancelled = false
 
     async function loadMembers() {
-      setLoading(true)
-      setErrorMessage('')
 
       // An RPC that returns rows can be ordered and paged like a table. user_id breaks ties.
       const { data, error } = await loadRows((options) => supabase
@@ -46,8 +45,12 @@ export default function Members() {
         .order('user_id'), 'user_id', () => cancelled)
 
       if (cancelled) return
+      // An error stays on screen until a reload succeeds.
       if (error) setErrorMessage(friendlyError(error))
-      else setMembers(data)
+      else {
+        setErrorMessage('')
+        setMembers(data)
+      }
       setLoading(false)
     }
 
@@ -62,6 +65,12 @@ export default function Members() {
     [member.email ?? '', memberName(member)].some((value) => value.toLowerCase().includes(query)))
 
   // ---------- Event handlers ----------
+  // Reloads the list and clears an old role-change error.
+  function reload() {
+    setActionError('')
+    setRefresh((value) => value + 1)
+  }
+
   // isModerator: true grants the role, false removes it. Reloads so the card shows the saved role.
   async function handleSetModerator(member, isModerator) {
     setActionError('')
@@ -69,7 +78,7 @@ export default function Members() {
     const { error } = await supabase.rpc('set_moderator', { p_user_id: member.user_id, p_is_moderator: isModerator })
     setBusy(false)
     if (error) setActionError(friendlyError(error))
-    else setRefresh((value) => value + 1)
+    else reload()
   }
 
   // ---------- Render ----------
@@ -79,7 +88,7 @@ export default function Members() {
       <div className="section-head">
         <h2 id="members-heading">Members</h2>
         <div className="actions">
-          <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh members</button>
+          <button type="button" disabled={loading} onClick={reload}>Refresh members</button>
         </div>
       </div>
       <p className="meta">Moderators review internship requests and moderate the forum.</p>
