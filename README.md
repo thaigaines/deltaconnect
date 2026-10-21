@@ -18,7 +18,7 @@ first password and let users reset forgotten passwords.
 | Internships `#/internships` | Members search, filter, and request listings (every field, including locations). Moderators add listings directly, edit details and locations, archive or restore listings, and review pending requests: edit, publish, or trash |
 | Forum `#/forum`, posts `#/forum/<id>` | Members post topics and comments; moderators remove any post or comment and pin posts first |
 | Resume directory `#/resumes` | Public, searchable by name or major; PDF downloads require no login |
-| Members `#/members` | Administrators only: every member's email, name (or "No profile"), and role, searchable by email or name; grant or remove the moderator role |
+| Members `#/members` | Administrators only: every member's email, name (or "No profile"), and role, plus "Invited" for accounts that have never signed in; searchable by email or name; grant or remove the moderator role |
 
 ## Run the website
 

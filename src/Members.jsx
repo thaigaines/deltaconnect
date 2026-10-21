@@ -1,4 +1,5 @@
-// Members page (administrators only): every approved member's email, name, and role, with
+// Members page (administrators only): every approved member's email, name, role, and whether
+// they're still invited (never signed in), with
 // buttons to grant or remove the moderator role. The database functions list_members() and
 // set_moderator() check administrator approval themselves; hiding this page is only for convenience.
 import { useEffect, useState } from 'react'
@@ -106,7 +107,11 @@ export default function Members() {
             <li key={member.user_id}>
               <div className="card-top">
                 <span className="company">{member.email}</span>
-                <span className="chip">{roleLabels[member.role]}</span>
+                {/* Invited: approved, but hasn't opened their invite link (or signed in) yet. */}
+                <div className="chips">
+                  {!member.has_signed_in && <span className="chip">Invited</span>}
+                  <span className="chip">{roleLabels[member.role]}</span>
+                </div>
               </div>
               <h3>{memberName(member)}</h3>
               {/* Administrators keep their role, so their cards have no button. */}
