@@ -22,7 +22,7 @@ Supabase handles authentication, database access, and Storage; the React fronten
 
 Keep the UI dark and minimal. Use purple only for active, actionable, or urgent elements (the hero's faint glow is the one requested exception), and add no decorative extras unless requested. Only clickable elements react to hover.
 
-Use DeltaConnect in text; the top bar and browser tab show the Δ mark. Keep setup documentation concise.
+Use DeltaConnect in text and the browser-tab title; the top bar and browser-tab icon show the Δ mark. Keep setup documentation concise.
 
 ## Database access and writes
 

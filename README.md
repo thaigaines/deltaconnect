@@ -1,6 +1,6 @@
 # DeltaConnect
 
-Internship listings and a public resume directory for one Delta Sigma Pi chapter.
+Internship listings, a member forum, and a public resume directory for one Delta Sigma Pi chapter.
 
 This README describes how the site works and is set up today. It records current
 behavior, not fixed requirements: when a better approach appears or a new need
@@ -39,6 +39,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 Restart Vite after changing these values. Use the publishable key; service-role
 and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
+
+## Source guide
+
+- `src/App.jsx`: navigation, login, email-link verification, and access checks.
+- `src/Home.jsx`, `src/Internships.jsx`, `src/Forum.jsx`, `src/ForumPost.jsx`, and `src/Resumes.jsx`: page data and presentation; adjacent form components handle writes.
+- `src/loadRows.js`: complete, ordered metadata loading for client-side search and lists.
+- `src/errors.js`: shared error messages; callers handle errors specific to their workflow.
+- `src/supabase.js`: shared client and resume bucket name; `src/styles.css`: shared styling.
+- `supabase/migrations/`: schema and permissions; `supabase/seed.sql` and `supabase/reset.sql`: optional sample data and destructive reset.
 
 ## Data model
 
@@ -107,10 +116,10 @@ initial locations atomically: published for editors, pending for other members. 
 runs with the caller's permissions and calls a `security definer` function in
 `private` that checks member approval, because members can't read the pending row
 they insert (Supabase advises against `security definer` functions in exposed
-schemas). Duplicate URLs require an explicit `p_allow_duplicate = true` override;
+schemas). On creation, duplicate URLs require an explicit `p_allow_duplicate = true` override;
 duplicate matches include pending and hidden rows. Editors save edits through
 `update_listing()`, which runs with their permissions and replaces the details and
-locations atomically.
+locations atomically; URL edits do not prompt for duplicate confirmation.
 Audit fields cannot be changed through ordinary client writes. `set_forum_post_pinned()`
 runs with the caller's permissions and calls a `security definer` function in `private`,
 which checks moderator approval; `is_pinned` is otherwise not client-writable.

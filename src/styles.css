@@ -8,7 +8,6 @@
 :root {
   --bg: #0a0a0c;                            /* page background */
   --surface: #111115;                       /* cards and panels */
-  --surface-hover: #15151a;                 /* card background on hover */
   --line: rgba(255, 255, 255, 0.08);        /* subtle borders */
   --line-strong: rgba(255, 255, 255, 0.1);  /* input, button, and chip borders */
   --text: #f2f2f5;                          /* main text */
@@ -200,9 +199,6 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
   background: var(--surface);
   overflow-wrap: anywhere; /* long URLs or names wrap instead of overflowing */
 }
-/* Only resume cards open something when clicked, so only they react to hover. */
-.resume-card { transition: border-color 0.15s, transform 0.15s, background-color 0.15s; }
-.resume-card:hover { border-color: var(--purple-line); background: var(--surface-hover); transform: translateY(-2px); }
 .results h3 { margin: 0; font-size: 1.3125rem; }
 .results p { margin: 0; }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }

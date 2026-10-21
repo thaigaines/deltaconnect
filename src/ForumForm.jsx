@@ -36,8 +36,10 @@ export default function ForumForm({ table, item, newFields, onSaved, onCancel })
       : await supabase.from(table).insert({ ...newFields, ...fields })
     setBusy(false)
 
-    // 23503: the author has no profile row for user_id to point to.
-    if (error?.code === '23503') setErrorMessage('Save your profile on the home page before posting.')
+    // 23503: the author has no profile, or a comment's post was deleted.
+    if (error?.code === '23503') setErrorMessage(hasTitle
+      ? 'Save your profile on the home page before posting.'
+      : 'Save your profile on the home page before commenting, or return to the forum if this post was deleted.')
     else if (error) setErrorMessage(friendlyError(error))
     else {
       // Clear a new comment's box; edit forms and new posts close instead.

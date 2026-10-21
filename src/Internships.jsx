@@ -240,8 +240,8 @@ export default function Internships({ isEditor }) {
 
       {message && <p role={message.isError ? 'alert' : 'status'}>{message.text}</p>}
 
-      {/* ----- Editor review of pending requests; hidden when there are none ----- */}
-      {pending.length > 0 && (
+      {/* ----- Pending requests follow the published list's loading/error state ----- */}
+      {!loading && !errorMessage && pending.length > 0 && (
         <div className="pending">
           <h3 className="panel-heading">Pending requests ({pending.length})</h3>
           <ul className="results">{pending.map(renderCard)}</ul>

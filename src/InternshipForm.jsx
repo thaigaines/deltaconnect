@@ -15,11 +15,13 @@ const stateCodes = [
 ]
 
 // 'Boston, ma; New York, NY' -> [{ city: 'Boston', state: 'MA' }, { city: 'New York', state: 'NY' }]
-// Blank entries and repeats are skipped; a missing city or state becomes '' for handleSubmit to reject.
+// Blank entries and repeats are skipped; null means an entry isn't City, ST.
 function parseLocations(text) {
-  return text.split(';')
+  const entries = text.split(';')
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
+  if (entries.some((entry) => entry.split(',').length !== 2)) return null
+  return entries
     .map((entry) => {
       const [city = '', state = ''] = entry.split(',').map((part) => part.trim())
       return { city, state: state.toUpperCase() }
@@ -85,7 +87,7 @@ export default function InternshipForm({ listing, isEditor, onClose, onSaved }) 
       return
     }
     const parsed = parseLocations(locations)
-    if (parsed.some((location) => !location.city || !location.state)) {
+    if (!parsed || parsed.some((location) => !location.city || !location.state)) {
       setErrorMessage('Write each location as City, ST and separate them with semicolons.')
       return
     }
