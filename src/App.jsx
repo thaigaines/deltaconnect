@@ -52,10 +52,12 @@ export default function App() {
   // useEffect(fn, deps) runs fn after render and again when a deps value changes ([] = once).
   // The function it returns is cleanup, run before the next run or when the component leaves.
 
-  // Track the page when a nav link changes the URL hash.
+  // Track the page when a nav link changes the URL hash. A notice (like "Password saved") belongs
+  // to the page it appeared on, so navigating clears it.
   useEffect(() => {
     function changePage() {
       setPage(window.location.hash)
+      setNotice('')
     }
     window.addEventListener('hashchange', changePage)
     return () => window.removeEventListener('hashchange', changePage)
