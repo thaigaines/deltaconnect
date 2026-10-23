@@ -6,10 +6,10 @@ import ResumeForm from './ResumeForm.jsx'
 import { friendlyError } from './errors.js'
 
 // ---------- Component ----------
-// userId: the signed-in member's id.
-export default function Home({ userId }) {
+// userId and email: the signed-in member's id and login email.
+export default function Home({ userId, email }) {
   // ---------- State ----------
-  // profile is the member's row with its resume nested, or null before the first save.
+  // profile is the member's row with its contact details and resume nested, or null before the first save.
   const [profile, setProfile] = useState(null)
   // Only the first load shows "Loading", so reloads after a save keep the forms (and their messages) on screen.
   const [loading, setLoading] = useState(true)
@@ -27,11 +27,12 @@ export default function Home({ userId }) {
     async function loadAccount() {
       setErrorMessage('')
 
-      // One profile and at most one resume per user, so resume comes back as an object or null.
+      // One profile with at most one contact row and one resume, so each comes back as an object or null.
       // maybeSingle returns null instead of an error when the profile doesn't exist yet.
       const { data, error } = await supabase
         .from('profile')
-        .select('first_name,last_name,major,graduation_term,graduation_year,linkedin_url,resume(object_path,original_filename)')
+        .select('first_name,last_name,major,graduation_term,graduation_year,linkedin_url,'
+          + 'profile_contact(phone,show_in_directory,show_email,show_phone),resume(object_path,original_filename)')
         .eq('user_id', userId)
         .maybeSingle()
 
@@ -74,14 +75,14 @@ export default function Home({ userId }) {
       ) : (
         <>
           <div className="panel">
-            <ProfileForm userId={userId} profile={profile} onSaved={reload} />
+            <ProfileForm userId={userId} email={email} profile={profile} onSaved={reload} />
           </div>
           {/* A resume needs a profile to name it. A new key (new file) resets the form after an upload. */}
           <div className="panel">
             {profile ? (
               <ResumeForm key={profile.resume?.object_path} userId={userId} resume={profile.resume} onSaved={handleResumeSaved} />
             ) : (
-              <p className="meta">Save your profile to share a resume.</p>
+              <p className="meta">Save your profile to add a resume.</p>
             )}
           </div>
         </>

@@ -1,5 +1,5 @@
 -- Enforces member/moderator/administrator access and ownership rules for listings, profiles,
--- the forum, member management, and public resume storage.
+-- the public member directory, the forum, member management, and public resume storage.
 CREATE FUNCTION private.is_approved_member()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM private.approved_member WHERE user_id = auth.uid()); $$;
@@ -174,25 +174,67 @@ $$;
 REVOKE ALL ON FUNCTION public.update_listing(uuid,text,text,text,text,date,boolean,jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.update_listing(uuid,text,text,text,text,date,boolean,jsonb) TO authenticated;
 
--- Visitors see only profiles whose owner shared a resume. Members see every profile (forum
--- author names); anyone signed in sees their own. Approved members create and edit only their own.
--- anon cannot call private functions, so each role gets its own policy.
-GRANT SELECT ON public.profile TO anon, authenticated;
+-- Members see every profile (forum author names); anyone signed in sees their own. Visitors read
+-- profiles only through list_directory(). Approved members create and edit only their own.
+GRANT SELECT ON public.profile TO authenticated;
 GRANT INSERT (user_id, first_name, last_name, major, graduation_term, graduation_year, linkedin_url),
   UPDATE (first_name, last_name, major, graduation_term, graduation_year, linkedin_url)
   ON public.profile TO authenticated;
-CREATE POLICY read_public_profiles ON public.profile FOR SELECT TO anon
-  USING (EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id));
 CREATE POLICY read_profiles ON public.profile FOR SELECT TO authenticated USING (
   (SELECT private.is_approved_member())
   OR user_id = (SELECT auth.uid())
-  OR EXISTS (SELECT 1 FROM public.resume r WHERE r.user_id = profile.user_id)
 );
 CREATE POLICY create_profile ON public.profile FOR INSERT TO authenticated
   WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
 CREATE POLICY edit_profile ON public.profile FOR UPDATE TO authenticated
   USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
   WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+
+-- Contact details and directory choices: only the owner reads or writes their row.
+GRANT SELECT ON public.profile_contact TO authenticated;
+GRANT INSERT (user_id, phone, show_in_directory, show_email, show_phone),
+  UPDATE (phone, show_in_directory, show_email, show_phone)
+  ON public.profile_contact TO authenticated;
+CREATE POLICY read_own_contact ON public.profile_contact FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
+CREATE POLICY create_own_contact ON public.profile_contact FOR INSERT TO authenticated
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+CREATE POLICY edit_own_contact ON public.profile_contact FOR UPDATE TO authenticated
+  USING ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()))
+  WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
+
+-- Public member directory. Visitors can't read profiles, contacts, resumes, or auth.users, so this
+-- SECURITY DEFINER function in private returns only what each approved member chose to share:
+-- members who opted in, with email and phone only when those are switched on. Revoked members drop out.
+CREATE FUNCTION private.list_directory()
+RETURNS TABLE (user_id uuid, first_name text, last_name text, major text, graduation_term text,
+  graduation_year smallint, linkedin_url text, object_path text, email text, phone text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT p.user_id, p.first_name, p.last_name, p.major, p.graduation_term, p.graduation_year,
+    p.linkedin_url, r.object_path,
+    CASE WHEN c.show_email THEN u.email::text END,
+    CASE WHEN c.show_phone THEN c.phone END
+  FROM public.profile_contact c
+  JOIN private.approved_member m ON m.user_id = c.user_id
+  JOIN public.profile p ON p.user_id = c.user_id
+  JOIN auth.users u ON u.id = c.user_id
+  LEFT JOIN public.resume r ON r.user_id = c.user_id
+  WHERE c.show_in_directory;
+$$;
+REVOKE ALL ON FUNCTION private.list_directory() FROM PUBLIC, anon, authenticated, service_role;
+-- Visitors need the private schema for this one function; everything else in it stays revoked,
+-- and future private functions start without the default PUBLIC execute permission.
+GRANT USAGE ON SCHEMA private TO anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA private REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.list_directory() TO anon, authenticated;
+
+CREATE FUNCTION public.list_directory()
+RETURNS TABLE (user_id uuid, first_name text, last_name text, major text, graduation_term text,
+  graduation_year smallint, linkedin_url text, object_path text, email text, phone text)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path = ''
+AS $$ SELECT * FROM private.list_directory(); $$;
+REVOKE ALL ON FUNCTION public.list_directory() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.list_directory() TO anon, authenticated;
 
 -- Forum: only members read. Members write their own posts and comments; authors or moderators delete.
 -- created_at, edited_at, and is_pinned are not client-writable.
@@ -270,9 +312,10 @@ GRANT EXECUTE ON FUNCTION public.set_forum_post_pinned(uuid, boolean) TO authent
 -- neither reachable by clients, so both functions are SECURITY DEFINER in private and check
 -- administrator approval themselves; public wrappers expose them with the caller's permissions.
 
--- Every approved member with their email, profile name (null without a profile), and highest role.
+-- Every approved member with their email, profile name (null without a profile), highest role,
+-- and whether they have signed in at least once (opening the invite link counts).
 CREATE FUNCTION private.list_members()
-RETURNS TABLE (user_id uuid, email text, first_name text, last_name text, role text)
+RETURNS TABLE (user_id uuid, email text, first_name text, last_name text, role text, has_signed_in boolean)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   IF NOT private.is_approved_administrator() THEN
@@ -282,7 +325,8 @@ BEGIN
     SELECT m.user_id, u.email::text, p.first_name, p.last_name,
       CASE WHEN a.user_id IS NOT NULL THEN 'administrator'
         WHEN o.user_id IS NOT NULL THEN 'moderator'
-        ELSE 'member' END
+        ELSE 'member' END,
+      u.last_sign_in_at IS NOT NULL
     FROM private.approved_member m
     JOIN auth.users u ON u.id = m.user_id
     LEFT JOIN public.profile p ON p.user_id = m.user_id
@@ -294,14 +338,13 @@ REVOKE ALL ON FUNCTION private.list_members() FROM PUBLIC, anon, authenticated, 
 GRANT EXECUTE ON FUNCTION private.list_members() TO authenticated;
 
 CREATE FUNCTION public.list_members()
-RETURNS TABLE (user_id uuid, email text, first_name text, last_name text, role text)
+RETURNS TABLE (user_id uuid, email text, first_name text, last_name text, role text, has_signed_in boolean)
 LANGUAGE sql STABLE SECURITY INVOKER SET search_path = ''
 AS $$ SELECT * FROM private.list_members(); $$;
 REVOKE ALL ON FUNCTION public.list_members() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.list_members() TO authenticated;
 
--- Grants (true) or removes (false) a member's moderator role. Administrators keep theirs:
--- removing it would also remove their administrator row (ON DELETE CASCADE).
+-- Grants (true) or removes (false) a member's moderator role. Administrators keep theirs.
 CREATE FUNCTION private.set_moderator(p_user_id uuid, p_is_moderator boolean)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
@@ -314,8 +357,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM private.approved_member WHERE user_id = p_user_id) THEN
     RAISE EXCEPTION 'Member not found.' USING ERRCODE = 'P0002';
   END IF;
+  -- Removing their moderator row would also remove their administrator row (ON DELETE CASCADE).
+  -- The default error code (P0001) lets the app show this message instead of a generic one.
   IF EXISTS (SELECT 1 FROM private.approved_administrator WHERE user_id = p_user_id) THEN
-    RAISE EXCEPTION 'Administrators always keep the moderator role.' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Administrators always keep the moderator role.';
   END IF;
   IF p_is_moderator THEN
     INSERT INTO private.approved_moderator (user_id) VALUES (p_user_id) ON CONFLICT DO NOTHING;
@@ -333,12 +378,13 @@ AS $$ SELECT private.set_moderator(p_user_id, p_is_moderator); $$;
 REVOKE ALL ON FUNCTION public.set_moderator(uuid, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_moderator(uuid, boolean) TO authenticated;
 
--- Resume listings are public, but only members may change their own metadata.
--- user_id is readable by everyone because it already appears in object_path.
-GRANT SELECT ON public.resume TO anon, authenticated;
+-- Members read and change only their own resume metadata; visitors see resumes through
+-- list_directory(), which lists only members who opted in.
+GRANT SELECT ON public.resume TO authenticated;
 GRANT INSERT (user_id, object_path, original_filename), UPDATE (object_path, original_filename), DELETE
   ON public.resume TO authenticated;
-CREATE POLICY read_resumes ON public.resume FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY read_own_resume ON public.resume FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
 CREATE POLICY create_resume ON public.resume FOR INSERT TO authenticated
   WITH CHECK ((SELECT private.is_approved_member()) AND user_id = (SELECT auth.uid()));
 CREATE POLICY edit_resume ON public.resume FOR UPDATE TO authenticated

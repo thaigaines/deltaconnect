@@ -178,7 +178,7 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 }
 
 /* ============================================================
-   Cards: used by both the internships and resumes lists
+   Cards: used by the internships, directory, and members lists
    ============================================================ */
 /* auto-fill fits as many 21rem-wide columns as the screen allows (one on phones). */
 .results {
@@ -203,13 +203,13 @@ input[type="file"] { padding: 0.625rem 0.875rem; } /* centers the file picker te
 .results p { margin: 0; }
 .company, .meta { color: var(--muted); font-size: 0.875rem; }
 .company { font-weight: 500; }
-/* Resume PDF preview at the top of each resume card, shaped like a letter page. */
+/* Resume PDF preview at the top of each directory card, shaped like a letter page. */
 .resume-preview { position: relative; overflow: hidden; aspect-ratio: 8.5 / 11; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--bg); }
 .resume-preview iframe { display: block; width: 100%; height: 100%; border: 0; }
 /* The link covers the preview (inset: 0). Its focus ring sits inside so overflow doesn't clip it. */
 .resume-preview a { position: absolute; inset: 0; }
 .resume-preview a:focus-visible { outline-offset: -3px; }
-.resume-card > a { align-self: flex-start; } /* LinkedIn link: only as wide as its text */
+.resume-card > a { align-self: flex-start; } /* email, phone, and LinkedIn links: only as wide as their text */
 .card-footer { margin-top: auto; padding-top: 0.875rem; border-top: 1px solid var(--line); } /* margin-top: auto pins the footer to the card bottom */
 /* Apply link styled as a purple pill, matching the button shape. */
 .apply {

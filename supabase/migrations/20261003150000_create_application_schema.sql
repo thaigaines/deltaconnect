@@ -11,7 +11,8 @@ CREATE TABLE public.internship (
   is_archived boolean NOT NULL DEFAULT false,
   is_pending boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE RESTRICT
+  -- Null once the creator's account is deleted; the listing stays.
+  created_by uuid DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE SET NULL
 );
 CREATE TABLE public.internship_location (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -48,6 +49,17 @@ CREATE TABLE public.profile (
   graduation_year smallint CHECK (graduation_year BETWEEN 2000 AND 2100),
   linkedin_url text CHECK (linkedin_url ~* '^https://([a-z]{2,3}\.)?linkedin\.com/in/[^/?#[:space:]]+/?$'),
   CONSTRAINT profile_graduation_check CHECK ((graduation_term IS NULL) = (graduation_year IS NULL))
+);
+-- Private contact details and directory choices, kept apart from profile because every member can
+-- read every profile (forum names). Only the owner reads this row; list_directory() shares the
+-- parts they opted in to. Everything starts hidden. Phone is optional, stored as +1 and 10 digits.
+CREATE TABLE public.profile_contact (
+  user_id uuid PRIMARY KEY DEFAULT auth.uid() REFERENCES public.profile(user_id) ON DELETE CASCADE,
+  phone text CHECK (phone ~ '^\+1[2-9][0-9]{2}[2-9][0-9]{6}$'),
+  show_in_directory boolean NOT NULL DEFAULT false,
+  show_email boolean NOT NULL DEFAULT false,
+  show_phone boolean NOT NULL DEFAULT false,
+  CONSTRAINT profile_contact_show_phone_check CHECK (NOT show_phone OR phone IS NOT NULL)
 );
 -- At most one resume per profile; a resume cannot exist without a profile to name it.
 CREATE TABLE public.resume (
@@ -86,6 +98,7 @@ CREATE INDEX forum_comment_user_id_idx ON public.forum_comment(user_id);
 ALTER TABLE public.internship ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.internship_location ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profile_contact ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resume ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_post ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_comment ENABLE ROW LEVEL SECURITY;
@@ -95,5 +108,5 @@ ALTER TABLE private.approved_administrator ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON private.approved_member, private.approved_moderator, private.approved_administrator
   FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON public.internship, public.internship_location, public.profile, public.resume,
+REVOKE ALL ON public.internship, public.internship_location, public.profile, public.profile_contact, public.resume,
   public.forum_post, public.forum_comment FROM PUBLIC, anon, authenticated;

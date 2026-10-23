@@ -64,7 +64,7 @@ export default function ResumeForm({ userId, resume, onSaved }) {
   // Removes the file first: if that fails, nothing changed and the member can retry. If the row
   // delete then fails, the row stays visible here so Delete can be clicked again.
   async function handleDelete() {
-    if (!window.confirm('Delete your resume? It will be removed from the public directory.')) return
+    if (!window.confirm('Delete your resume? It will also be removed from the directory.')) return
     setErrorMessage('')
     setBusy(true)
 
@@ -91,7 +91,7 @@ export default function ResumeForm({ userId, resume, onSaved }) {
           Current file: <a href={supabase.storage.from(resumeBucket).getPublicUrl(resume.object_path).data.publicUrl}
             target="_blank" rel="noopener noreferrer">{resume.original_filename}</a>
         </p>
-      ) : <p className="meta">Share a PDF in the public resume directory.</p>}
+      ) : <p className="meta">Upload a PDF. It appears in the directory if your profile is shown there.</p>}
 
       {/* accept only filters the file picker; handleSubmit does the real check. */}
       <label>

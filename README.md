@@ -1,6 +1,6 @@
 # DeltaConnect
 
-Internship listings, a member forum, and a public resume directory for one Delta Sigma Pi chapter.
+Internship listings, a member forum, and a public member directory for one Delta Sigma Pi chapter.
 
 This README describes how the site works and is set up today. It records current
 behavior, not fixed requirements: when a better approach appears or a new need
@@ -14,10 +14,10 @@ first password and let users reset forgotten passwords.
 
 | Page | Current behavior |
 | --- | --- |
-| Account home `#/` | Approved members save their name, major, graduation term/year, optional LinkedIn, and upload, replace, or delete their resume |
+| Account home `#/` | Approved members save their name, major, graduation term/year, optional LinkedIn and US phone number, and directory choices (show profile, email, phone; all off until checked); they upload, replace, or delete their resume |
 | Internships `#/internships` | Members search, filter, and request listings (every field, including locations). Moderators add listings directly, edit details and locations, archive or restore listings, and review pending requests: edit, publish, or trash |
 | Forum `#/forum`, posts `#/forum/<id>` | Members post topics and comments; moderators remove any post or comment and pin posts first |
-| Resume directory `#/resumes` | Public, searchable by name or major; PDF downloads require no login |
+| Member directory `#/directory` | Public, searchable by name or major. Lists members who chose to appear, with name, major, graduation, LinkedIn, and resume, plus their login email and phone only if they chose to show them; PDF downloads require no login |
 | Members `#/members` | Administrators only: every member's email, name (or "No profile"), and role, plus "Invited" for accounts that have never signed in; searchable by email or name; grant or remove the moderator role |
 
 ## Run the website
@@ -44,7 +44,7 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 ## Source guide
 
 - `src/App.jsx`: navigation, login, email-link verification, and access checks.
-- `src/Home.jsx`, `src/Internships.jsx`, `src/Forum.jsx`, `src/ForumPost.jsx`, `src/Members.jsx`, and `src/Resumes.jsx`: page data and presentation; adjacent form components handle writes.
+- `src/Home.jsx`, `src/Internships.jsx`, `src/Forum.jsx`, `src/ForumPost.jsx`, `src/Members.jsx`, and `src/Directory.jsx`: page data and presentation; adjacent form components handle writes.
 - `src/loadRows.js`: complete, ordered metadata loading for client-side search and lists.
 - `src/errors.js`: shared error messages; callers handle errors specific to their workflow.
 - `src/supabase.js`: shared client and resume bucket name; `src/styles.css`: shared styling.
@@ -56,7 +56,8 @@ and secret keys must stay out of frontend code. `.env.local` is ignored by Git.
 | --- | --- | --- |
 | `public.internship` | Listing content, optional deadline, archive and pending (member request awaiting review) status, and creation audit fields | `created_by` → `auth.users.id`; set to null when that account is deleted |
 | `public.internship_location` | One US city/state pair per row; multiple locations per listing | `internship_id` → `internship.id`; cascading deletion |
-| `public.profile` | One per user, created on first save; name, major, graduation term/year, optional LinkedIn URL. New user details become columns here | `user_id` → `auth.users.id`; cascading deletion |
+| `public.profile` | One per user, created on first save; name, major, graduation term/year, optional LinkedIn URL. New member-visible details become columns here | `user_id` → `auth.users.id`; cascading deletion |
+| `public.profile_contact` | Owner-only: optional phone (`+1` and 10 digits) and directory choices `show_in_directory`, `show_email`, `show_phone` (default off; showing a phone requires one). New private details become columns here | `user_id` → `profile.user_id`; cascading deletion |
 | `public.resume` | At most one resume per profile; unique object path, original filename, upload time | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_post` | Title, body, creation time, `edited_at` (set when the text changes), and `is_pinned` | `user_id` → `profile.user_id`; cascading deletion |
 | `public.forum_comment` | Body, creation time, and `edited_at`; a flat list under one post | `forum_post_id` → `forum_post.id`, `user_id` → `profile.user_id`; cascading deletion |
@@ -73,7 +74,7 @@ spelling and capitalization; state is an uppercase US state/territory code.
 
 ## Permissions and listing behavior
 
-RLS is enabled on all nine tables. Keep `private` outside the Data API.
+RLS is enabled on all ten tables. Keep `private` outside the Data API.
 
 ### Account access and roles
 
@@ -87,9 +88,9 @@ existing account. Administrators grant and remove the moderator role on the memb
 page; the administrator row is added only by hand in SQL. These hosted
 settings and approvals must be verified separately.
 
-The resume directory and PDF downloads belong on a separate public page and
-require no login. Saving a profile and uploading a resume require an approved
-account, and a resume requires a profile.
+The member directory and PDF downloads require no login. Saving a profile and
+uploading a resume require an approved account, and a resume or contact row
+requires a profile.
 
 Ordinary clients use these permissions:
 
@@ -97,10 +98,12 @@ Ordinary clients use these permissions:
 | --- | --- | --- |
 | Internships | Members see active rows (never pending ones, including their own); moderators see all rows | Members create pending requests through `create_listing()`. Moderators create published listings, edit content/archive status, publish requests, and delete only pending requests |
 | Locations | Same visibility as their internship | Moderators create, edit city/state, and delete |
-| Profiles | Visitors: profiles with a resume. Members: all profiles. Owners: their own | Approved members create and edit only their own row |
+| Profiles | Members: all profiles. Owners: their own. Visitors: only through `list_directory()` | Approved members create and edit only their own row |
+| Contact details and directory choices | Owners only | Approved members create and edit only their own row |
+| Member directory | Everyone, through `list_directory()`: approved members who opted in; email and phone only when shown | Through the owner's contact row |
 | Forum posts and comments | Members only | Members create, edit, and delete their own (a profile is required); moderators delete any. Edits set `edited_at` |
 | Forum pinning | Members (part of each post) | Moderators only, through `set_forum_post_pinned()`; pinned posts list first |
-| Resume metadata | Everyone | Approved members manage only their own row |
+| Resume metadata | Owners; everyone else through `list_directory()` | Approved members manage only their own row |
 | Member list and moderator role | Administrators only, through `list_members()` | Administrators only, through `set_moderator()`; administrators always keep their moderator role |
 | Approval tables | No direct client access | Administrators change the moderator role through `set_moderator()`; all other changes in the SQL Editor |
 
@@ -128,7 +131,13 @@ Audit fields cannot be changed through ordinary client writes. `set_forum_post_p
 runs with the caller's permissions and calls a `security definer` function in `private`,
 which checks moderator approval; `is_pinned` is otherwise not client-writable.
 `list_members()` and `set_moderator()` follow the same pattern and check administrator
-approval, since emails live in `auth.users` and roles in `private`.
+approval, since emails live in `auth.users` and roles in `private`. `list_directory()`
+follows it too: visitors can't read profiles, contacts, resumes, or `auth.users`, so the
+`private` function returns only what each member chose to share. Visitors get `private`
+schema usage for that one function; everything else there stays revoked, and new
+`private` functions start without the default public execute permission. The directory
+shows the login email; a separate contact email would be a new `profile_contact` column
+returned in place of the login email when set (the function's result columns stay the same).
 
 ### Listing presentation
 
@@ -151,7 +160,9 @@ row, so a failure leaves a row the member can delete again. Replacing a resume
 uploads to a new path, saves the metadata, then removes the old file; Supabase advises against overwriting
 because its CDN can serve stale copies. File and database writes are separate:
 handle failures and cleanup in code. Metadata/account deletion does not remove
-Storage files. Revoking membership does not unpublish existing resumes.
+Storage files. Revoking membership or leaving the directory removes the member from
+the directory, but a resume URL someone already saved keeps working until the file
+is replaced or deleted.
 Deleted public files may remain available from CDN or browser caches temporarily.
 
 **Anyone with the public URL can download a resume.** The owner's UUID is visible
@@ -199,4 +210,6 @@ UUID in the same SQL session. No credentials or real user data are seeded.
 
 To start over, empty the `dsp-public-resumes` bucket in the dashboard, run
 `supabase/reset.sql` (it deletes all DeltaConnect data and approvals but keeps Auth
-accounts), then run the migrations again and re-approve the kept accounts by hand.
+accounts), then run the migrations again and re-approve the kept accounts by hand. If the project
+was set up with the Supabase CLI, also clear its migration history (or use
+`supabase migration repair`) so removed migration versions don't conflict.

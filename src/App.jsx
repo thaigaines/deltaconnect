@@ -1,16 +1,16 @@
 // Top-level component: layout, navigation, login, and access checks.
-// Shows the public resume directory (Resumes.jsx), or for members the account home (Home.jsx),
+// Shows the public member directory (Directory.jsx), or for members the account home (Home.jsx),
 // internships (Internships.jsx), or forum (Forum.jsx, ForumPost.jsx); administrators also get
 // the members page (Members.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Forum from './Forum.jsx'
 import ForumPost from './ForumPost.jsx'
+import Directory from './Directory.jsx'
 import Home from './Home.jsx'
 import Internships from './Internships.jsx'
 import Members from './Members.jsx'
 import PasswordForm from './PasswordForm.jsx'
-import Resumes from './Resumes.jsx'
 import { friendlyError } from './errors.js'
 
 // ---------- Helpers ----------
@@ -23,7 +23,7 @@ export default function App() {
   // ---------- State ----------
   // useState returns [value, setter]; calling the setter re-renders the component.
 
-  // The URL part after '#', e.g. '#/resumes'.
+  // The URL part after '#', e.g. '#/directory'.
   const [page, setPage] = useState(window.location.hash)
 
   // Login form. busy disables buttons while a request runs.
@@ -98,13 +98,13 @@ export default function App() {
   // Effects depend on the id, not the session, so re-checking the same user changes nothing.
   const userId = session?.user.id
   // '#/forum/<id>' opens one post. Any other hash, including none, is the home page.
-  const isResumesPage = page === '#/resumes'
+  const isDirectoryPage = page === '#/directory'
   const isInternshipsPage = page === '#/internships'
   const forumPostId = page.startsWith('#/forum/') ? page.slice('#/forum/'.length) : null
   const isForumPage = page === '#/forum' || forumPostId !== null
   // Only administrators have a members page; for anyone else '#/members' is the home page.
   const isMembersPage = page === '#/members' && permissions?.is_administrator === true
-  const isHomePage = !isResumesPage && !isInternshipsPage && !isForumPage && !isMembersPage
+  const isHomePage = !isDirectoryPage && !isInternshipsPage && !isForumPage && !isMembersPage
 
   // Check member access and roles whenever the user changes or access is refreshed.
   // Clearing first means one account never sees another's access.
@@ -134,7 +134,7 @@ export default function App() {
     : forumPostId ? <ForumPost key={`${memberKey}:${forumPostId}`} postId={forumPostId} userId={userId} isModerator={permissions?.is_moderator} />
     : isForumPage ? <Forum key={memberKey} />
     : isMembersPage ? <Members key={memberKey} />
-    : <Home key={memberKey} userId={userId} />
+    : <Home key={memberKey} userId={userId} email={session?.user.email} />
 
   // ---------- Event handlers ----------
   function refreshAccess() {
@@ -206,7 +206,7 @@ export default function App() {
               <a href="#/" aria-current={isHomePage ? 'page' : undefined}>Home</a>
               <a href="#/internships" aria-current={isInternshipsPage ? 'page' : undefined}>Internships</a>
               <a href="#/forum" aria-current={isForumPage ? 'page' : undefined}>Forum</a>
-              <a href="#/resumes" aria-current={isResumesPage ? 'page' : undefined}>Resumes</a>
+              <a href="#/directory" aria-current={isDirectoryPage ? 'page' : undefined}>Directory</a>
               {permissions?.is_administrator && (
                 <a href="#/members" aria-current={isMembersPage ? 'page' : undefined}>Members</a>
               )}
@@ -227,7 +227,7 @@ export default function App() {
         <div className="container">
           <h1>DeltaConnect</h1>
           <p className="tagline">
-            {isResumesPage ? 'Meet the chapter.'
+            {isDirectoryPage ? 'Meet the chapter.'
               : isInternshipsPage ? 'Internships curated by our chapter, for our chapter.'
               : isForumPage ? 'Questions and conversations for our chapter.'
               : isMembersPage ? 'Chapter accounts and roles.'
@@ -240,8 +240,8 @@ export default function App() {
       <main className="container">
         {session && settingPassword ? (
           <PasswordForm onDone={handlePasswordSaved} />
-        ) : isResumesPage ? (
-          <Resumes />
+        ) : isDirectoryPage ? (
+          <Directory />
         ) : loadingSession ? (
           <p role="status">Checking login...</p>
         ) : session ? (
